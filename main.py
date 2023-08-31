@@ -34,8 +34,7 @@ from typing import Callable
 def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..., torch.Tensor], 
           reconstruction_loss_fn: nn.Module | Callable[..., torch.Tensor],
           diffusion_optimizer: torch.optim.Optimizer, autoencoder_optimizer: torch.optim.Optimizer,
-          train_dataloader: DataLoader, regularizer_loss: nn.Module | Callable[..., torch.Tensor],
-          regularization_coefficient:float=.05,
+          train_dataloader: DataLoader,
           n_epoch: int = 100, start_from_epoch: int = 0, start_step: int = 0,
           with_autocast: bool = True, log_comet: bool = False,
           comet_api_key: str = None, comet_project_name: str = None):
@@ -102,13 +101,13 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
             if with_autocast:
                 with autocast():
                     x0 = model.autoencoder.decode(x0)
-                    r_loss = reconstruction_loss_fn(x0, img) + regularization_coefficient * regularizer_loss(x0, img)
+                    r_loss = reconstruction_loss_fn(x0, img) + vqloss
                 grad_scaler.scale(r_loss).backward()
                 grad_scaler.step(autoencoder_optimizer)
                 grad_scaler.update()
             else:
                 x0 = model.autoencoder.decode(x0)
-                r_loss = reconstruction_loss_fn(x0, img) + regularization_coefficient * regularizer_loss(x0, img)
+                r_loss = reconstruction_loss_fn(x0, img) + vqloss
                 r_loss.backward()
                 autoencoder_optimizer.step()
             # log shit
@@ -198,7 +197,6 @@ if __name__ == '__main__':
 
         noise_loss = nn.MSELoss()
         reconstruction_loss = nn.MSELoss()
-        regularizer_loss = nn.KLDivLoss()
         train_dataloader = DataLoader(
             PixivDataset(args.dataset_path, imageSize=256,
                         return_original=False, transforms=T.Lambda(lambda t: (t * 2) - 1)),
@@ -208,7 +206,7 @@ if __name__ == '__main__':
         
 
         train(model, 1000, noise_loss, reconstruction_loss, d_optim, a_optim, 
-              train_dataloader, regularizer_loss, regularization_coefficient=.1, with_autocast=args.autocast,
+              train_dataloader, with_autocast=args.autocast,
             n_epoch=args.epoch, start_from_epoch=start, start_step=step, 
             #log_comet=True, comet_api_key='eOx1MRhzKKQPd9SJ73ZSC1E4N',
             comet_project_name='ddpm-pixiv')
