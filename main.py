@@ -119,6 +119,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
                     comet_logger.log_metric('r_loss', r_loss, training_step)
 
             losses.append(d_loss.item())
+            rlosses.append(r_loss.item())
             pbar.update(task, advance=1, loss=d_loss.item(), rloss=r_loss.item())
             training_step += 1
 
