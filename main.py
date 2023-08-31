@@ -174,7 +174,11 @@ if __name__ == '__main__':
     model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.unet.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     a_optim = torch.optim.AdamW(model.autoencoder.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+    if args.compile:
+        model = torch.compile(model, backend='inductor', mode='reduce-overhead')
+    
     print("Model initialized")
+
     summary(model, verbose=1)
 
     start = 0
