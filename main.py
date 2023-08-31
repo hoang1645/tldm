@@ -127,9 +127,9 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
         state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": model.state_dict()}
         console.print("Saving checkpoint...")
         torch.save(state_dict, "checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth".format(
-            epoch=epoch, d_loss=d_loss, r_loss=r_loss))
+            epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item()))
         console.print("Checkpoint saved at [i]checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth[i]".format(
-            epoch=epoch, d_loss=d_loss, r_loss=r_loss))
+            epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item()))
         pbar.stop()
 
 def parse_args():
