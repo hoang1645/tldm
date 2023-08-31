@@ -125,11 +125,13 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
 
         # summarize and save checkpoint
         console.print(f"Epoch {epoch}, average loss = {sum(losses) / len(losses)}, reconstruction loss = {sum(rlosses) / len(losses)}.")
-        state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": model.state_dict()}
+        state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": model.state_dict(),
+                      "diffusion_optim": diffusion_optimizer.state_dict(),
+                      "autoencoder_optim": autoencoder_optimizer.state_dict()}
         console.print("Saving checkpoint...")
         torch.save(state_dict, "checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth".format(
             epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item()))
-        console.print("Checkpoint saved at [i]checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth[i]".format(
+        console.print("Checkpoint saved at [i]checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth[/i]".format(
             epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item()))
         pbar.stop()
 
@@ -183,6 +185,8 @@ if __name__ == '__main__':
         model.load_state_dict(dicts['state_dict'])
         start = dicts['epoch']
         step = dicts['step']
+        d_optim.load_state_dict(dicts['diffusion_optim'])
+        a_optim.load_state_dict(dicts['autoencoder_optim'])
 
         print("Loaded from checkpoint", args.from_ckpt)
 
@@ -208,9 +212,7 @@ if __name__ == '__main__':
 
         train(model, 1000, noise_loss, reconstruction_loss, d_optim, a_optim, 
               train_dataloader, with_autocast=args.autocast,
-            n_epoch=args.epoch, start_from_epoch=start, start_step=step, 
-            #log_comet=True, comet_api_key='eOx1MRhzKKQPd9SJ73ZSC1E4N',
-            comet_project_name='ddpm-pixiv')
+            n_epoch=args.epoch, start_from_epoch=start, start_step=step)
 
     else:
         model.eval()
