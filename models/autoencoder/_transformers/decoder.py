@@ -31,8 +31,10 @@ class TransformerDecoderLayer(nn.Module):
 
     def forward(self, x:torch.Tensor): 
         if self.norm_first:
+            x = x.transpose(-1, -2)
             x = self.norm(x)
-        
+            x = x.transpose(-1, -2)
+
         x = self.attn(x)
         x = torch.nn.functional.dropout(x, self.dropout, training=self.training)
         x = self.ffn1(x)
@@ -42,8 +44,10 @@ class TransformerDecoderLayer(nn.Module):
         x = self.activation(x)
 
         if not self.norm_first:
+            x = x.transpose(-1, -2)
             x = self.norm(x)
-        
+            x = x.transpose(-1, -2)
+            
         return x
     
 class LatentSpaceDecoder(nn.Module):

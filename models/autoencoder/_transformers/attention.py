@@ -31,7 +31,9 @@ class TransformerMultiHeadAttention(nn.Module):
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         is_cuda = x.is_cuda
+        x = x.transpose(-1, -2)
         x = self.norm(x)
+        x = x.transpose(-1, -2)
         qkv = self.to_qkv(x).chunk(3, dim = 1)
         q, k, v = map(lambda t: rearrange(t, 'b (h c) p -> b p h c', h = self.n_heads).contiguous(), qkv)
 
