@@ -18,7 +18,7 @@ class LDM(nn.Module):
 
         self.unet = unet
         self.autoencoder = autoencoder
-        self.image_dim = (image_channels, image_size // self.autoencoder.encoder.kernel_size, image_size // self.autoencoder.encoder.kernel_size)
+        self.image_dim = (image_channels, image_size // 8, image_size // 8)
         self.n_diffusion_steps = n_diffusion_steps
         self.device = device
         self.inverse_scale_transform = inverse_scale_transform

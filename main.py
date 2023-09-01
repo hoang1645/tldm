@@ -173,7 +173,7 @@ if __name__ == '__main__':
     print(args)
 
     unet = UNet(in_chan=32, out_chan=32, embed_dim=128, n_attn_heads=8, dim_head=64, conv_init_chan=128, chan_mults=(1,2,4,8))
-    autoencoder = AutoencoderVQ(16, 512, 8, 4, 0, torch.nn.functional.relu, 32, 8192)
+    autoencoder = AutoencoderVQ(32, 8192)
     model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.unet.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     a_optim = torch.optim.AdamW(model.autoencoder.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
@@ -183,7 +183,6 @@ if __name__ == '__main__':
     print("Model initialized")
 
     summary(model, verbose=1)
-
     start = 0
     step = 0
 
