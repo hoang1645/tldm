@@ -1,0 +1,3 @@
+[submodule "vq-vae-2-pytorch"]
+	path = vq-vae-2-pytorch
+	url = https://github.com/rosinality/vq-vae-2-pytorch
