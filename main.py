@@ -51,7 +51,8 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
     # Prepare gradient scaler, if autocast is used
     grad_scaler = None
     if with_autocast:
-        grad_scaler = GradScaler()
+        a_grad_scaler = GradScaler()
+        d_grad_scaler = GradScaler()
 
 
 
@@ -87,9 +88,9 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
                 with autocast():
                     x1 = model.forward(x1, timesteps_tensor)
                     d_loss = diffusion_loss_fn(x1, noise)
-                grad_scaler.scale(d_loss).backward()
-                grad_scaler.step(diffusion_optimizer)
-                grad_scaler.update()
+                d_grad_scaler.scale(d_loss).backward()
+                d_grad_scaler.step(diffusion_optimizer)
+                d_grad_scaler.update()
             else:
                 x1 = model.forward(x1, timesteps_tensor)
                 d_loss = diffusion_loss_fn(x1, noise)
@@ -102,9 +103,9 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
                 with autocast():
                     x0 = model.autoencoder.decode(x0)
                     r_loss = reconstruction_loss_fn(x0, img) + vqloss
-                grad_scaler.scale(r_loss).backward()
-                grad_scaler.step(autoencoder_optimizer)
-                grad_scaler.update()
+                a_grad_scaler.scale(r_loss).backward()
+                a_grad_scaler.step(autoencoder_optimizer)
+                a_grad_scaler.update()
             else:
                 x0 = model.autoencoder.decode(x0)
                 r_loss = reconstruction_loss_fn(x0, img) + vqloss
