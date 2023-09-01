@@ -186,7 +186,7 @@ if __name__ == '__main__':
 
     if args.from_ckpt is not None:
         dicts = torch.load(args.from_ckpt)
-        model.load_state_dict(dicts['state_dict'])
+        model.load_state_dict(dicts['state_dict'], strict=False)
         start = dicts['epoch']
         step = dicts['step']
         d_optim.load_state_dict(dicts['diffusion_optim'])

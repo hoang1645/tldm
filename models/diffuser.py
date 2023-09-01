@@ -12,13 +12,13 @@ from typing import List
 
 class LDM(nn.Module):
     def __init__(self, unet: UNet, autoencoder: AutoencoderVQ,
-                 image_size: int, image_channels: int = 3, n_diffusion_steps: int = 1000,
+                 image_size: int, image_channels: int = 32, n_diffusion_steps: int = 1000,
                  device: str | torch.device = 'cuda', inverse_scale_transform: bool = True):
         super().__init__()
 
         self.unet = unet
         self.autoencoder = autoencoder
-        self.image_dim = (image_channels, image_size, image_size)
+        self.image_dim = (image_channels, image_size // self.autoencoder.encoder.kernel_size, image_size // self.autoencoder.encoder.kernel_size)
         self.n_diffusion_steps = n_diffusion_steps
         self.device = device
         self.inverse_scale_transform = inverse_scale_transform
@@ -65,7 +65,7 @@ class LDM(nn.Module):
     @torch.no_grad()
     def backward_diffusion_sampling(self, timesteps: int = 1000, num_images: int = 1, return_grid=True, n_image_per_row: int = 5) -> \
             Image.Image | List[Image.Image]:
-        x = torch.randn((num_images, *self.image_dim), device=self.device)
+        x = torch.randn((num_images, 32, 16, 16), device=self.device)
         self.eval()
 
         pbar = Progress(TextColumn("Generating"), BarColumn(), MofNCompleteColumn(), TimeElapsedColumn(),
