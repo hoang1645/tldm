@@ -54,7 +54,8 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
         a_grad_scaler = GradScaler()
         d_grad_scaler = GradScaler()
 
-
+    # stablizing training on autoencoder
+    a_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(autoencoder_optimizer, 4000, args.lr / 10)
 
     # initialize training step
     training_step = start_step
@@ -111,6 +112,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
                 r_loss = reconstruction_loss_fn(x0, img) + vqloss
                 r_loss.backward()
                 autoencoder_optimizer.step()
+            a_lr_scheduler.step()
             # log shit
             if (training_step + 1) % 50 == 0:
                 tensorboard_logger.add_scalar('d_loss', d_loss, training_step)
