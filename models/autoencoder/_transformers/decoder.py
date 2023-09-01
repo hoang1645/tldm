@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 from einops import rearrange
-from .normalization import RootMeanSquaredNorm as RMSNorm
 from typing import Callable, Tuple
 from .attention import TransformerMultiHeadAttention
 
@@ -23,7 +22,7 @@ class TransformerDecoderLayer(nn.Module):
         super().__init__()
         self.ffn1 = nn.Conv1d(d_model, d_ff, kernel_size=1)
         self.ffn2 = nn.Conv1d(d_ff, d_model, kernel_size=1)
-        self.norm = RMSNorm(d_model)
+        self.norm = nn.LayerNorm(d_model)
         self.attn = TransformerMultiHeadAttention(d_model, n_heads, 
                                                   d_head = d_model//n_heads, dropout=dropout, flash=True)
         self.activation = activation

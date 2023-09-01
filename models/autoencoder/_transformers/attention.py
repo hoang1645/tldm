@@ -3,7 +3,6 @@ from torch import nn
 from torch.backends.cuda import sdp_kernel
 from xformers.ops import memory_efficient_attention
 from einops import rearrange
-from .normalization import RootMeanSquaredNorm as RMSNorm
 from typing import Callable
 
 class TransformerMultiHeadAttention(nn.Module):
@@ -25,7 +24,7 @@ class TransformerMultiHeadAttention(nn.Module):
         self.non_gpu_config = {'enable_flash':True, 'enable_math':True, 'enable_mem_efficient':True}
         hidden_dim = d_head * n_heads
 
-        self.norm = RMSNorm(dim)
+        self.norm = nn.LayerNorm(dim)
 
         self.to_qkv = nn.Conv1d(dim, hidden_dim * 3, 1, bias = False)
         self.to_out = nn.Conv1d(hidden_dim, dim, 1)
