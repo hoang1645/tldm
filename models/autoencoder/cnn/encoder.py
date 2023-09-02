@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 class LatentSpaceEncoder(nn.Module):
     def __init__(self, n_channels_init:int, in_chan:int=3, out_chan:int=32, leaky_relu_slope:float=.2):
+        super().__init__()
         self.leaky_relu_slope = leaky_relu_slope
         self.conv_init = nn.Sequential(
             nn.Conv2d(in_chan, n_channels_init, 7, padding='same'),

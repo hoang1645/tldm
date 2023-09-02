@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 class LatentSpaceDecoder(nn.Module):
     def __init__(self, n_channels_init:int, in_chan:int=32, out_chan:int=3, n_blocks:int=8):
+        super().__init__()
         self.init_conv = nn.Sequential(
             nn.Conv2d(in_chan, n_channels_init, 3, padding=1),
             nn.PReLU()
