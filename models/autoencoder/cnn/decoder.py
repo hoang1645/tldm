@@ -19,7 +19,10 @@ class LatentSpaceDecoder(nn.Module):
             nn.BatchNorm2d(n_channels_init)
         )
         self.upscaler = nn.Sequential(*[self.__upscale_block(n_channels_init) for _ in range(4)])
-        self.final_conv = nn.Conv2d(n_channels_init, 3, 9, padding='same')
+        self.final_conv = nn.Sequential(
+            nn.Conv2d(n_channels_init, 3, 9, padding='same'),
+            nn.Tanh()
+        )
 
 
     def __make_block(self, in_channels):
