@@ -18,7 +18,7 @@ class LatentSpaceDecoder(nn.Module):
             nn.Conv2d(n_channels_init, n_channels_init, 3, padding=1),
             nn.BatchNorm2d(n_channels_init)
         )
-        self.upscaler = nn.Sequential(*[self.__upscale_block(n_channels_init) for _ in range(3)])
+        self.upscaler = nn.Sequential(*[self.__upscale_block(n_channels_init) for _ in range(4)])
         self.final_conv = nn.Conv2d(n_channels_init, 3, 9, padding='same')
 
 
