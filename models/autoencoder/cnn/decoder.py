@@ -1,30 +1,47 @@
 import torch
-from torch import nn
-from einops import rearrange
-from typing import Callable, Tuple
-from .cnn import ResnetBlock
-    
+from torch import nn 
+import torch.nn.functional as F
+
+
+
 class LatentSpaceDecoder(nn.Module):
-    def __init__(self, in_chan:int=32, out_chan:int=3, 
-                 conv_init_chan:int=32,
-                 activation: Callable[..., torch.Tensor]=torch.nn.functional.relu,
-                 chan_mults:Tuple[int, int, int, int]=(8, 4, 2, 1),
-                 upscale:int=8,
-                 ):
-        super().__init__()
-        self.conv_init = nn.Conv2d(in_chan, conv_init_chan * chan_mults[0] * upscale ** 2, 3, padding='same')
-        self.layers = nn.Sequential()
-        for i, o in zip (chan_mults, list(chan_mults)[1:] + [1]): self.layers.append(ResnetBlock(i * conv_init_chan, o * conv_init_chan))
-        self.upsampler = nn.PixelShuffle(upscale)
-        self.activation = activation
-        self.last_conv = nn.LazyConv2d(out_chan, 3, padding='same')
-    def forward(self, x:torch.Tensor):
-        assert x.dim() == 4
-        x = self.conv_init(x)
-        x = self.upsampler(x)
-        x = self.layers(x)
-        x = self.activation(x)
-        
-        x = self.last_conv(x)
-        return x
+    def __init__(self, n_channels_init:int, in_chan:int=32, out_chan:int=3, n_blocks:int=8):
+        self.init_conv = nn.Sequential(
+            nn.Conv2d(in_chan, n_channels_init, 3, padding=1),
+            nn.PReLU()
+        )
+        self.residual_blocks = nn.ModuleList([
+            self.__make_block(n_channels_init) for _ in range(n_blocks)
+        ])
+        self.out_residual = nn.Sequential(
+            nn.Conv2d(n_channels_init, n_channels_init, 3, padding=1),
+            nn.BatchNorm2d(n_channels_init)
+        )
+        self.upscaler = nn.Sequential(*[self.__upscale_block(n_channels_init) for _ in range(3)])
+        self.final_conv = nn.Conv2d(n_channels_init, 3, 9, padding='same')
+
+
+    def __make_block(self, in_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(in_channels),
+            nn.PReLU(),
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(in_channels)
+        )
+    def __upscale_block(self, in_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, in_channels << 2, 3, padding=1),
+            nn.PixelShuffle(2),
+            nn.PReLU()
+        )
     
+    def forward(self, x):
+        x = self.init_conv(x)
+        x_1 = x
+        for block in self.residual_blocks:
+            x = x + block(x)
+        x = x_1 + self.out_residual(x)
+        x = self.upscaler(x)
+        x = self.final_conv(x)
+        return x

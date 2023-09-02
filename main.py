@@ -10,7 +10,7 @@ from comet_ml import Experiment
 # self-defined utilities
 from models.unet import UNet
 from models.diffuser import LDM
-from models.autoencoder.autoencoders import AutoencoderVQ
+from models.autoencoder.autoencoders_cnn import AutoencoderVQ
 # progress bar
 from rich.console import Console
 from rich.progress import Progress, BarColumn, TextColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn, \
@@ -173,7 +173,7 @@ if __name__ == '__main__':
     print(args)
 
     unet = UNet(in_chan=32, out_chan=32, embed_dim=128, n_attn_heads=8, dim_head=64, conv_init_chan=128, chan_mults=(1,2,4,8))
-    autoencoder = AutoencoderVQ(16, 512, 8, 4, 0, torch.nn.functional.relu, 32, 8192)
+    autoencoder = AutoencoderVQ(64, quant_dim=32, codebook_size=8192)
     model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.unet.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     a_optim = torch.optim.AdamW(model.autoencoder.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
