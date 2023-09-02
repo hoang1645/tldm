@@ -103,13 +103,13 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
             if with_autocast:
                 with autocast():
                     x0 = model.autoencoder.decode(x0)
-                    r_loss = reconstruction_loss_fn(x0, img) + vqloss
+                    r_loss = reconstruction_loss_fn(x0, img) + .25 * vqloss
                 a_grad_scaler.scale(r_loss).backward()
                 a_grad_scaler.step(autoencoder_optimizer)
                 a_grad_scaler.update()
             else:
                 x0 = model.autoencoder.decode(x0)
-                r_loss = reconstruction_loss_fn(x0, img) + vqloss
+                r_loss = reconstruction_loss_fn(x0, img) + .25 *vqloss
                 r_loss.backward()
                 autoencoder_optimizer.step()
             a_lr_scheduler.step()
