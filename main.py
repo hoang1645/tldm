@@ -148,7 +148,7 @@ def parse_args():
     # parser.add_argument('--eps', type=float, required=False, default=1e-6)
     # parser.add_argument('--discriminator_type', type=str, choices=['style-gan', 'resnet18', 'resnet34'],
     #                     default='style-gan', required=False)
-
+    parser.add_argument('--debug', action=argparse.BooleanOptionalAction, help="sanity check")
     parser.add_argument('--lr', type=float, required=False, default=2e-4, help='learning rate')
     parser.add_argument('--batch_size', type=int, required=False, default=4, help='batch size')
     parser.add_argument('--beta1', type=float, required=False, default=.5, help='adam optimization algorithm\'s β1')
@@ -173,7 +173,7 @@ if __name__ == '__main__':
     print(args)
 
     unet = UNet(in_chan=32, out_chan=32, embed_dim=128, n_attn_heads=8, dim_head=64, conv_init_chan=128, chan_mults=(1,2,4,8))
-    autoencoder = AutoencoderVQ(64, n_residual_blocks=96, quant_dim=32, codebook_size=16384)
+    autoencoder = AutoencoderVQ(64, quant_dim=32, codebook_size=16384)
     model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.unet.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     a_optim = torch.optim.AdamW(model.autoencoder.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
@@ -183,7 +183,11 @@ if __name__ == '__main__':
     print("Model initialized")
 
     summary(model, verbose=1)
-
+    if args.debug:
+        x = torch.randn(1, 3, args.image_size, args.image_size).to(model.device)
+        t = torch.randint(1, 1000, size=(1,)).to(model.device)
+        print(model.autoencoder(x)[0].shape) 
+        exit(0)
     start = 0
     step = 0
 

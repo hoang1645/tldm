@@ -11,10 +11,10 @@ from einops import rearrange
 
     
 class Autoencoder(nn.Module):
-    def __init__(self, n_channels_init:int, latent_space_channel_dim:int=32, n_residual_blocks:int=8, lrelu_slope:float=.2):
+    def __init__(self, n_channels_init:int, latent_space_channel_dim:int=32, lrelu_slope:float=.2):
         super().__init__()
         self.encoder = LatentSpaceEncoder(n_channels_init, out_chan=latent_space_channel_dim, leaky_relu_slope=lrelu_slope)
-        self.decoder = LatentSpaceDecoder(n_channels_init, in_chan=latent_space_channel_dim, n_blocks=n_residual_blocks)
+        self.decoder = LatentSpaceDecoder(n_channels_init, in_chan=latent_space_channel_dim)
         
     def forward(self, x:torch.Tensor):
         return self.encoder(self.decoder(x))
@@ -24,9 +24,9 @@ class Autoencoder(nn.Module):
         raise NotImplementedError()
 
 class AutoencoderKL(Autoencoder):
-    def __init__(self,  n_channels_init:int, latent_space_channel_dim:int=32, n_residual_blocks:int=8, lrelu_slope:float=.2,
+    def __init__(self,  n_channels_init:int, latent_space_channel_dim:int=32, lrelu_slope:float=.2,
                  kl_penalty:float=1e-6):
-        super().__init__(n_channels_init, latent_space_channel_dim, n_residual_blocks, lrelu_slope)
+        super().__init__(n_channels_init, latent_space_channel_dim, lrelu_slope)
         self.regularization_loss = nn.KLDivLoss()
         self.kl_penalty = kl_penalty
 
@@ -35,9 +35,9 @@ class AutoencoderKL(Autoencoder):
         return self.kl_penalty * self.regularization_loss.forward(_input, target)
     
 class AutoencoderVQ(Autoencoder):
-    def __init__(self, n_channels_init:int, latent_space_channel_dim:int=32, n_residual_blocks:int=8, lrelu_slope:float=.2,
+    def __init__(self, n_channels_init:int, latent_space_channel_dim:int=32, lrelu_slope:float=.2,
                  quant_dim:int=32, codebook_size:int=512):
-        super().__init__(n_channels_init, latent_space_channel_dim, n_residual_blocks, lrelu_slope)
+        super().__init__(n_channels_init, latent_space_channel_dim, lrelu_slope)
         self.codebook_size = codebook_size
         self.vquantizer = VectorQuantize(quant_dim, self.codebook_size, learnable_codebook=True, channel_last=False, ema_update=False)
         self.quant_conv = nn.Conv2d(latent_space_channel_dim, quant_dim, 1)

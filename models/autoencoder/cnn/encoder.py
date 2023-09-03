@@ -1,7 +1,7 @@
 import torch
 from torch import nn 
 import torch.nn.functional as F
-
+from .residual import ResBlock
 
 
 class LatentSpaceEncoder(nn.Module):
@@ -19,15 +19,16 @@ class LatentSpaceEncoder(nn.Module):
         )
 
         self.main_sequence_blocks = nn.Sequential(*[
-            self.__make_block(n_channels_init << i) for i in range(3)
+            self.__make_block(n_channels_init << i, 2*i + 4) for i in range(3)
         ])
 
         self.last_conv = nn.Conv2d(n_channels_init << 3, out_chan, kernel_size=3, padding=1)
-    def __make_block(self, in_channels):
+    def __make_block(self, in_channels, n_residual_blocks):
         return nn.Sequential(
             nn.Conv2d(in_channels, in_channels * 2, kernel_size=3, padding=1),
             nn.BatchNorm2d(in_channels * 2),
             nn.LeakyReLU(self.leaky_relu_slope),
+            ResBlock(in_channels * 2, n_residual_blocks, lambda x: F.leaky_relu(x, self.leaky_relu_slope)),
             nn.Conv2d(in_channels * 2, in_channels * 2, kernel_size=3, padding=1, stride=2),
             nn.BatchNorm2d(in_channels * 2),
             nn.LeakyReLU(self.leaky_relu_slope)
