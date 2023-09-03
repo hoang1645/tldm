@@ -16,10 +16,10 @@ class LatentSpaceDecoder(nn.Module):
         ])
         self.final_block = nn.Sequential(
             ResBlock(n_channels_init << 3, 8, F.relu6),
-            self.__upscale_block(n_channels_init << 3, n_channels_init << 3)
+            self.__upscale_block(n_channels_init << 3, n_channels_init)
         )
         self.final_conv = nn.Sequential(
-            nn.Conv2d(n_channels_init << 3, out_chan, 3, padding='same'),
+            nn.Conv2d(n_channels_init, out_chan, 3, padding='same'),
         )
 
 
