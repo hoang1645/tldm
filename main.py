@@ -105,14 +105,16 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
                     x0 = model.autoencoder.decode(x0)
                     r_loss = reconstruction_loss_fn(x0, img) + .25 * vqloss
                 a_grad_scaler.scale(r_loss).backward()
+                a_lr_scheduler.step()
                 a_grad_scaler.step(autoencoder_optimizer)
                 a_grad_scaler.update()
             else:
                 x0 = model.autoencoder.decode(x0)
                 r_loss = reconstruction_loss_fn(x0, img) + .25 *vqloss
                 r_loss.backward()
+                a_lr_scheduler.step()
                 autoencoder_optimizer.step()
-            a_lr_scheduler.step()
+            
             # log shit
             if (training_step + 1) % 50 == 0:
                 tensorboard_logger.add_scalar('d_loss', d_loss, training_step)
