@@ -164,6 +164,7 @@ def parse_args():
     parser.add_argument('--num_gen', type=int, required=False, default=100, 
                         help='how many images to generate for FID eval, used in conjunction with --evaluate_fid. ignored if --infer is not on')
     parser.add_argument('--compile', action=argparse.BooleanOptionalAction, help='torch.compile(model, mode=\'reduce-overhead\') (requires torch>=2.0 and linux kernel)')
+    parser.add_argument('--reset_optimizers', action=argparse.BooleanOptionalAction, help='reset optimizer states, ignored if no checkpoints are passed')
     # parser.add_argument('--update_discriminator_every_n_steps', type=int, required=False, default=1)
     return parser.parse_args()
 
@@ -192,8 +193,9 @@ if __name__ == '__main__':
         model.load_state_dict(dicts['state_dict'], strict=False)
         start = dicts['epoch']
         step = dicts['step']
-        d_optim.load_state_dict(dicts['diffusion_optim'])
-        a_optim.load_state_dict(dicts['autoencoder_optim'])
+        if not args.reset_optimizers:
+            d_optim.load_state_dict(dicts['diffusion_optim'])
+            a_optim.load_state_dict(dicts['autoencoder_optim'])
 
         print("Loaded from checkpoint", args.from_ckpt)
 
