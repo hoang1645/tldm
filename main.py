@@ -27,6 +27,7 @@ from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
 import torchvision.transforms.v2 as T
 from generation_evaluate.metrics import FID
+import os
 # typing
 from typing import Callable
 
@@ -37,7 +38,9 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
           train_dataloader: DataLoader,
           n_epoch: int = 100, start_from_epoch: int = 0, start_step: int = 0,
           with_autocast: bool = True, log_comet: bool = False,
-          comet_api_key: str = None, comet_project_name: str = None):
+          comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None):
+    if ckpt_save_path is None:
+        ckpt_save_path = '.'
     # Prepare model
     model = model.train()
     # initialize loggers
@@ -134,10 +137,12 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
                       "diffusion_optim": diffusion_optimizer.state_dict(),
                       "autoencoder_optim": autoencoder_optimizer.state_dict()}
         console.print("Saving checkpoint...")
-        torch.save(state_dict, "checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth".format(
-            epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item()))
-        console.print("Checkpoint saved at [i]checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth[/i]".format(
-            epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item()))
+        torch.save(state_dict, os.path.join(ckpt_save_path,
+                                            "checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth".format(
+            epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item())))
+        console.print(f"Checkpoint saved at [i]{os.path.join(ckpt_save_path,
+                    'checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth'.format(
+            epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item()))}[/i]")
         pbar.stop()
 
 def parse_args():
@@ -167,6 +172,7 @@ def parse_args():
                         help='how many images to generate for FID eval, used in conjunction with --evaluate_fid. ignored if --infer is not on')
     parser.add_argument('--compile', action=argparse.BooleanOptionalAction, help='torch.compile(model, mode=\'reduce-overhead\') (requires torch>=2.0 and linux kernel)')
     parser.add_argument('--reset_optimizers', action=argparse.BooleanOptionalAction)
+    parser.add_argument('--save_ckpt', type=str, help='where to save checkpoints. defaults to the current directory.', required=False, default=None)
     # parser.add_argument('--update_discriminator_every_n_steps', type=int, required=False, default=1)
     return parser.parse_args()
 
@@ -227,7 +233,7 @@ if __name__ == '__main__':
 
         train(model, 1000, noise_loss, reconstruction_loss, d_optim, a_optim, 
               train_dataloader, with_autocast=args.autocast,
-            n_epoch=args.epoch, start_from_epoch=start, start_step=step)
+            n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt)
 
     else:
         model.eval()
