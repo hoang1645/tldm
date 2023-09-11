@@ -140,9 +140,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
         torch.save(state_dict, os.path.join(ckpt_save_path,
                                             "checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth".format(
             epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item())))
-        console.print(f"Checkpoint saved at [i]{os.path.join(ckpt_save_path,
-                    'checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth'.format(
-            epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item()))}[/i]")
+        console.print(f"Checkpoint saved at [i]{os.path.join(ckpt_save_path, 'checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth'.format(epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item()))}[/i]")
         pbar.stop()
 
 def parse_args():
