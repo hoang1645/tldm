@@ -19,7 +19,7 @@ class LatentSpaceEncoder(nn.Module):
         )
 
         self.main_sequence_blocks = nn.Sequential(*[
-            self.__make_block(n_channels_init << i, 2*i + 4) for i in range(3)
+            self.__make_block(n_channels_init << i, 2*i + 1) for i in range(3)
         ])
 
         self.last_conv = nn.Conv2d(n_channels_init << 3, out_chan, kernel_size=3, padding=1)
