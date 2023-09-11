@@ -27,7 +27,7 @@ class LatentSpaceEncoder(nn.Module):
             nn.Conv2d(in_channels, in_channels * 2, kernel_size=3, padding=1),
             nn.BatchNorm2d(in_channels * 2),
             nn.SiLU(),
-            ResBlock(in_channels * 2, n_residual_blocks, lambda x: F.leaky_relu(x, self.leaky_relu_slope)),
+            ResBlock(in_channels * 2, n_residual_blocks, F.silu),
             nn.Conv2d(in_channels * 2, in_channels * 2, kernel_size=3, padding=1, stride=2),
             nn.BatchNorm2d(in_channels * 2),
             nn.SiLU()
