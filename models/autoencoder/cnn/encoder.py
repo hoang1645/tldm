@@ -5,17 +5,16 @@ from .residual import ResBlock
 
 
 class LatentSpaceEncoder(nn.Module):
-    def __init__(self, n_channels_init:int, in_chan:int=3, out_chan:int=32, leaky_relu_slope:float=.2):
+    def __init__(self, n_channels_init:int, in_chan:int=3, out_chan:int=32):
         super().__init__()
-        self.leaky_relu_slope = leaky_relu_slope
         self.conv_init = nn.Sequential(
             nn.Conv2d(in_chan, n_channels_init, 7, padding='same'),
-            nn.LeakyReLU(self.leaky_relu_slope)
+            nn.SiLU()
         )
         self.init_block = nn.Sequential(
             nn.Conv2d(n_channels_init, n_channels_init, stride=2, kernel_size=3, padding=1),
             nn.BatchNorm2d(n_channels_init),
-            nn.LeakyReLU(self.leaky_relu_slope)
+            nn.SiLU()
         )
 
         self.main_sequence_blocks = nn.Sequential(*[
@@ -27,11 +26,11 @@ class LatentSpaceEncoder(nn.Module):
         return nn.Sequential(
             nn.Conv2d(in_channels, in_channels * 2, kernel_size=3, padding=1),
             nn.BatchNorm2d(in_channels * 2),
-            nn.LeakyReLU(self.leaky_relu_slope),
+            nn.SiLU(),
             ResBlock(in_channels * 2, n_residual_blocks, lambda x: F.leaky_relu(x, self.leaky_relu_slope)),
             nn.Conv2d(in_channels * 2, in_channels * 2, kernel_size=3, padding=1, stride=2),
             nn.BatchNorm2d(in_channels * 2),
-            nn.LeakyReLU(self.leaky_relu_slope)
+            nn.SiLU()
         )
     
     def forward(self, x):

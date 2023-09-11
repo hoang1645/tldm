@@ -9,7 +9,7 @@ class LatentSpaceDecoder(nn.Module):
         super().__init__()
         self.init_conv = nn.Sequential(
             nn.Conv2d(in_chan, n_channels_init, 3, padding=1),
-            nn.PReLU()
+            nn.SiLU()
         )
         self.residual_blocks = nn.Sequential(*[
             self.__make_block(n_channels_init << i, 2*i + 2) for i in range(3)
@@ -33,7 +33,7 @@ class LatentSpaceDecoder(nn.Module):
         return nn.Sequential(
             nn.Conv2d(in_channels, out_channels << 2, 3, padding=1),
             nn.PixelShuffle(2),
-            nn.PReLU()
+            nn.SiLU()
         )
     
     def forward(self, x):
