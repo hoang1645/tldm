@@ -156,9 +156,9 @@ def parse_args():
     # parser.add_argument('--discriminator_type', type=str, choices=['style-gan', 'resnet18', 'resnet34'],
     #                     default='style-gan', required=False)
     parser.add_argument('--debug', action=argparse.BooleanOptionalAction, help="sanity check")
-    parser.add_argument('--lr', type=float, required=False, default=2e-4, help='learning rate')
+    parser.add_argument('--lr', type=float, required=False, default=2e-5, help='learning rate')
     parser.add_argument('--batch_size', type=int, required=False, default=4, help='batch size')
-    parser.add_argument('--beta1', type=float, required=False, default=.5, help='adam optimization algorithm\'s β1')
+    parser.add_argument('--beta1', type=float, required=False, default=.9, help='adam optimization algorithm\'s β1')
     parser.add_argument('--beta2', type=float, required=False, default=.99, help='adam optimization algorithm\'s β2')
     parser.add_argument('--autocast', action=argparse.BooleanOptionalAction, required=False, help='use automatic type casting')
     parser.add_argument('--from_ckpt', type=str, required=False, default=None, help='load model from checkpoint at specified path')
