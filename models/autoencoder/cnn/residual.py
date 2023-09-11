@@ -10,7 +10,8 @@ class ResBlock(nn.Module):
         self.blocks = nn.ModuleList([self.__make_block(n_channels) for _ in range(n_residual_blocks)])
     def __make_block(self, n_channels):
         return nn.Sequential(nn.Conv2d(n_channels, n_channels, 3, padding=1),
-                             nn.BatchNorm2d(n_channels))
+                             nn.BatchNorm2d(n_channels),
+                             nn.SiLU())
     def forward(self, x: torch.Tensor)->torch.Tensor:
         x0 = x
         for block in self.blocks:
