@@ -42,6 +42,7 @@ class AutoencoderVQ(Autoencoder):
         self.vquantizer = VectorQuantize(quant_dim, self.codebook_size, learnable_codebook=True, channel_last=False, ema_update=False)
         self.quant_conv = nn.Conv2d(d_model // kernel_size, quant_dim, 1)
         self.post_quant_conv = nn.Conv2d(quant_dim, d_model // kernel_size, 1)
+        self.device = 'cuda'
 
     def encode(self, x:torch.Tensor):
         x = self.encoder(x)
