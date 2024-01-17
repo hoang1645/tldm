@@ -67,7 +67,6 @@ def train(model: AutoencoderVQ,
     console = Console()
     for epoch in range(start_from_epoch, n_epoch):
         # save losses for logging to console
-        losses = []
         rlosses = []
         # progress bar
         pbar = Progress(TextColumn("[green]Epoch {}/{}".format(epoch, n_epoch)), BarColumn(), MofNCompleteColumn(),
@@ -122,7 +121,7 @@ def train(model: AutoencoderVQ,
             training_step += 1
 
         # summarize and save checkpoint
-        console.print(f"Epoch {epoch}, reconstruction loss = {sum(rlosses) / len(losses)}.")
+        console.print(f"Epoch {epoch}, reconstruction loss = {sum(rlosses) / len(rlosses)}.")
         state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": model.state_dict(),
                       
                       "autoencoder_optim": optimizer.state_dict()}
