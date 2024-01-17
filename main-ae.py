@@ -162,7 +162,7 @@ if __name__ == '__main__':
     print(args)
 
     unet = UNet(in_chan=32, out_chan=32, embed_dim=128, n_attn_heads=8, dim_head=64, conv_init_chan=160, chan_mults=(1,2,4,4))
-    model = AutoencoderVQ(64, quant_dim=32, codebook_size=16384)
+    model = AutoencoderVQ(64, quant_dim=32, codebook_size=8192)
     model = model.cuda()
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
