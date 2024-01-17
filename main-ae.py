@@ -32,13 +32,13 @@ import os
 from typing import Callable
 
 
-def train(model: AutoencoderVQ, timesteps: int,
+def train(model: AutoencoderVQ,
           reconstruction_loss_fn: nn.Module | Callable[..., torch.Tensor],
           optimizer: torch.optim.Optimizer,
           train_dataloader: DataLoader,
           n_epoch: int = 100, start_from_epoch: int = 0, start_step: int = 0,
           with_autocast: bool = True, log_comet: bool = False,
-          comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None):
+          comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None, accumulate_gradients:int=1):
     if ckpt_save_path is None:
         ckpt_save_path = '.'
     # Prepare model
@@ -74,7 +74,7 @@ def train(model: AutoencoderVQ, timesteps: int,
                         TimeElapsedColumn(), TextColumn("||"), TimeRemainingColumn(),
                         TextColumn("loss = {task.fields[loss]:.4}, reconstruction loss = {task.fields[rloss]:.4}"), console=console,
                         transient=True)
-
+        loss_accumulate = 0.0
         task = pbar.add_task("", total=len(train_dataloader), loss=0.0, rloss=.0)
         pbar.start()
         # train
@@ -91,16 +91,24 @@ def train(model: AutoencoderVQ, timesteps: int,
                 with autocast():
                     x0 = model.decode(x0)
                     r_loss = reconstruction_loss_fn(x0, img) + .25 * vqloss
-                a_grad_scaler.scale(r_loss).backward()
-                a_lr_scheduler.step()
-                a_grad_scaler.step(optimizer)
-                a_grad_scaler.update()
+                if training_step % accumulate_gradients == accumulate_gradients - 1:
+                    a_grad_scaler.scale(loss_accumulate).backward()
+                    a_lr_scheduler.step()
+                    a_grad_scaler.step(optimizer)
+                    a_grad_scaler.update()
+                    loss_accumulate = 0
+                else:
+                    loss_accumulate += r_loss
             else:
-                x0 = model.autoencoder.decode(x0)
+                x0 = model.decode(x0)
                 r_loss = reconstruction_loss_fn(x0, img) + .25 *vqloss
-                r_loss.backward()
-                a_lr_scheduler.step()
-                optimizer.step()
+                if training_step % accumulate_gradients == accumulate_gradients - 1:
+                    r_loss.backward()
+                    a_lr_scheduler.step()
+                    optimizer.step()
+                    loss_accumulate = 0
+                else:
+                    loss_accumulate += r_loss
             
             # log shit
             if (training_step + 1) % 50 == 0:
@@ -153,6 +161,7 @@ def parse_args():
     parser.add_argument('--compile', action=argparse.BooleanOptionalAction, help='torch.compile(model, mode=\'reduce-overhead\') (requires torch>=2.0 and linux kernel)')
     parser.add_argument('--reset_optimizers', action=argparse.BooleanOptionalAction)
     parser.add_argument('--save_ckpt', type=str, help='where to save checkpoints. defaults to the current directory.', required=False, default=None)
+    parser.add_argument('--accumulate_gradients', '-a', type=int, default=1, help='number of gradient accumulation steps, default=1 (no accumulation)')
     # parser.add_argument('--update_discriminator_every_n_steps', type=int, required=False, default=1)
     return parser.parse_args()
 
@@ -211,8 +220,8 @@ if __name__ == '__main__':
 
     
 
-    train(model, 1000, reconstruction_loss, d_optim, 
+    train(model, reconstruction_loss, d_optim, 
             train_dataloader, with_autocast=args.autocast,
-        n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt)
+        n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt, accumulate_gradients=args.accumulate_gradients)
 
             
