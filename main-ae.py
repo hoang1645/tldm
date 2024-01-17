@@ -65,6 +65,7 @@ def train(model: AutoencoderVQ,
 
     # console for rich
     console = Console()
+    loss_accumulate = 0.0
     for epoch in range(start_from_epoch, n_epoch):
         # save losses for logging to console
         rlosses = []
@@ -73,7 +74,6 @@ def train(model: AutoencoderVQ,
                         TimeElapsedColumn(), TextColumn("||"), TimeRemainingColumn(),
                         TextColumn("loss = {task.fields[loss]:.4}, reconstruction loss = {task.fields[rloss]:.4}"), console=console,
                         transient=True)
-        loss_accumulate = 0.0
         task = pbar.add_task("", total=len(train_dataloader), loss=0.0, rloss=.0)
         pbar.start()
         # train
