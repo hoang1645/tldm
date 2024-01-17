@@ -122,7 +122,7 @@ def train(model: AutoencoderVQ,
             training_step += 1
 
         # summarize and save checkpoint
-        console.print(f"Epoch {epoch}, average loss = {sum(losses) / len(losses)}, reconstruction loss = {sum(rlosses) / len(losses)}.")
+        console.print(f"Epoch {epoch}, reconstruction loss = {sum(rlosses) / len(losses)}.")
         state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": model.state_dict(),
                       
                       "autoencoder_optim": optimizer.state_dict()}
