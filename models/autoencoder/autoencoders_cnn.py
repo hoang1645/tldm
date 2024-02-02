@@ -7,6 +7,7 @@ from typing import Any, Callable
 from vector_quantize_pytorch import VectorQuantize
 from abc import abstractmethod
 from einops import rearrange
+from torch.cuda.amp.autocast_mode import autocast
 
 
     
@@ -16,6 +17,8 @@ class Autoencoder(nn.Module):
         self.encoder = LatentSpaceEncoder(n_channels_init, out_chan=latent_space_channel_dim)
         self.decoder = LatentSpaceDecoder(n_channels_init, in_chan=latent_space_channel_dim)
         
+    def encode(self, x:torch.Tensor): return self.encoder(x)
+    def decode(self, x:torch.Tensor): return self.decoder(x)
     def forward(self, x:torch.Tensor):
         return self.encoder(self.decoder(x))
     
@@ -27,12 +30,14 @@ class AutoencoderKL(Autoencoder):
     def __init__(self,  n_channels_init:int, latent_space_channel_dim:int=32,
                  kl_penalty:float=1e-6):
         super().__init__(n_channels_init, latent_space_channel_dim)
-        self.regularization_loss = nn.KLDivLoss()
+        self.regularization_loss = nn.KLDivLoss(False)
         self.kl_penalty = kl_penalty
-
+        self.device = 'cuda'
+    
+    @autocast(enabled=False)
     def reg_loss(self, _input:torch.Tensor):
-        target = torch.randn_like(_input)
-        return self.kl_penalty * self.regularization_loss.forward(_input, target)
+        target = F.softmax(torch.randn_like(_input), dim=0)
+        return self.kl_penalty * self.regularization_loss.forward(F.log_softmax(_input, dim=0), target)
     
 class AutoencoderVQ(Autoencoder):
     def __init__(self, n_channels_init:int, latent_space_channel_dim:int=32,
@@ -46,11 +51,15 @@ class AutoencoderVQ(Autoencoder):
         self.device = 'cuda'
 
     def encode(self, x:torch.Tensor):
+        dtype = x.dtype
         x = self.encoder(x)
         h = x.shape[2]
         x = self.quant_conv(x)
         x = rearrange(x, "b c h w -> b c (h w)")
-        x, idx, loss = self.vquantizer(x)
+        x = x.float()
+        x, idx, loss = self.vquantizer.forward(x)
+        x = x.to(dtype)
+        loss = loss.to(dtype)
         x = rearrange(x, "b c (h w) -> b c h w", h=h)
         return x, idx, loss
     

@@ -10,7 +10,7 @@ from comet_ml import Experiment
 # self-defined utilities
 from models.unet import UNet
 from models.diffuser import LDM
-from models.autoencoder.autoencoders_cnn import AutoencoderVQ
+from models.autoencoder.autoencoders_cnn import AutoencoderVQ, AutoencoderKL
 # progress bar
 from rich.console import Console
 from rich.progress import Progress, BarColumn, TextColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn, \
@@ -33,7 +33,7 @@ from typing import Callable
 from accelerate import Accelerator
 
 
-def train(model: AutoencoderVQ,
+def train(model: AutoencoderKL,
           reconstruction_loss_fn: nn.Module | Callable[..., torch.Tensor],
           optimizer: torch.optim.Optimizer, lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
           train_dataloader: DataLoader,
@@ -84,25 +84,27 @@ def train(model: AutoencoderVQ,
             batch_size = img.shape[0]
             img = img.float().to(model.device)
             if fp16: img = img.half()
-            x0, idx, vqloss = model.encode(img)
-            
-
+            if autocast():
+                with autocast():
+                    x0 = model.encode(img)
+                    klloss = model.reg_loss(x0)
+            else:
+                x0 = model.encode(img)
+                klloss = model.reg_loss(x0)
             optimizer.zero_grad()
 
             if with_autocast:
                 with autocast():
                     x0 = model.decode(x0)
-                    r_loss = reconstruction_loss_fn(x0, img) + .25 * vqloss
+                    r_loss = reconstruction_loss_fn(x0, img) + klloss
                 a_grad_scaler.scale(r_loss).backward()
                 lr_scheduler.step()
                 a_grad_scaler.step(optimizer)
                 a_grad_scaler.update()
-                x0 = model.decode(x0)
-                r_loss = reconstruction_loss_fn(x0, img) + .25 *vqloss
 
             else:
                 x0 = model.decode(x0)
-                r_loss = reconstruction_loss_fn(x0, img) + .25 *vqloss
+                r_loss = reconstruction_loss_fn(x0, img) + klloss
                 if fp16: a_grad_scaler.scale(r_loss).backward()
                 else: r_loss.backward()
                 lr_scheduler.step()
@@ -169,7 +171,7 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     print(args)
-    model = AutoencoderVQ(32, latent_space_channel_dim=4, codebook_size=8192)
+    model = AutoencoderKL(32, latent_space_channel_dim=4, kl_penalty=1e-6)
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),
