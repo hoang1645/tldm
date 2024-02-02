@@ -37,7 +37,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
           diffusion_optimizer: torch.optim.Optimizer, autoencoder_optimizer: torch.optim.Optimizer,
           train_dataloader: DataLoader,
           n_epoch: int = 100, start_from_epoch: int = 0, start_step: int = 0,
-          with_autocast: bool = True, log_comet: bool = False,
+          with_autocast: bool = True, fp16: bool=False, log_comet: bool = False,
           comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None):
     if ckpt_save_path is None:
         ckpt_save_path = '.'

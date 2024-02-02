@@ -12,11 +12,11 @@ class LatentSpaceDecoder(nn.Module):
             nn.SiLU()
         )
         self.residual_blocks = nn.Sequential(*[
-            self.__make_block(n_channels_init << i, 2*i + 2) for i in range(3)
+            self.__make_block(n_channels_init << i, 2*i + 2) for i in range(2)
         ])
         self.final_block = nn.Sequential(
-            ResBlock(n_channels_init << 3, 8, F.relu6),
-            self.__upscale_block(n_channels_init << 3, n_channels_init)
+            ResBlock(n_channels_init << 2, 4, F.relu6),
+            self.__upscale_block(n_channels_init << 2, n_channels_init)
         )
         self.final_conv = nn.Sequential(
             nn.Conv2d(n_channels_init, out_chan, 3, padding='same'),

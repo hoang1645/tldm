@@ -13,11 +13,12 @@ class PixivDataset(Dataset):
 
         if transforms is not None:
             self.transform = T.Compose(
-                [T.ToTensor(),
+                [T.ToImage(), T.ToDtype(torch.float32, scale=True),
                  T.Resize([imageSize, imageSize], T.InterpolationMode.BICUBIC, antialias=True), transforms])
         else:
-            self.transform = T.Compose([T.ToTensor(),
-                T.Resize([imageSize, imageSize], T.InterpolationMode.BICUBIC, antialias=True)
+            self.transform = T.Compose([T.ToImage(), T.ToDtype(torch.float32, scale=True),
+                T.Resize([imageSize, imageSize], T.InterpolationMode.BICUBIC, antialias=True),
+                transforms
             ])
 
         self.imagePath = imagePath

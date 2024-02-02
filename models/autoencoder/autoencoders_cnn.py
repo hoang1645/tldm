@@ -36,10 +36,11 @@ class AutoencoderKL(Autoencoder):
     
 class AutoencoderVQ(Autoencoder):
     def __init__(self, n_channels_init:int, latent_space_channel_dim:int=32,
-                 quant_dim:int=32, codebook_size:int=512):
+                 codebook_size:int=512):
         super().__init__(n_channels_init, latent_space_channel_dim)
+        quant_dim = latent_space_channel_dim
         self.codebook_size = codebook_size
-        self.vquantizer = VectorQuantize(quant_dim, self.codebook_size, learnable_codebook=True, channel_last=False, ema_update=False)
+        self.vquantizer = VectorQuantize(quant_dim, self.codebook_size, channel_last=False, ema_update=True)
         self.quant_conv = nn.Conv2d(latent_space_channel_dim, quant_dim, 1)
         self.post_quant_conv = nn.Conv2d(quant_dim, latent_space_channel_dim, 1)
         self.device = 'cuda'

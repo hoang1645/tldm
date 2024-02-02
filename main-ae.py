@@ -30,19 +30,21 @@ from generation_evaluate.metrics import FID
 import os
 # typing
 from typing import Callable
+from accelerate import Accelerator
 
 
 def train(model: AutoencoderVQ,
           reconstruction_loss_fn: nn.Module | Callable[..., torch.Tensor],
-          optimizer: torch.optim.Optimizer,
+          optimizer: torch.optim.Optimizer, lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
           train_dataloader: DataLoader,
           n_epoch: int = 100, start_from_epoch: int = 0, start_step: int = 0,
-          with_autocast: bool = True, log_comet: bool = False,
+          with_autocast: bool = True, fp16:bool=False, log_comet: bool = False,
           comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None, accumulate_gradients:int=1):
     if ckpt_save_path is None:
         ckpt_save_path = '.'
     # Prepare model
     model = model.train()
+    if fp16: model = model.half()
     # initialize loggers
     tensorboard_logger = SummaryWriter()  # log saved at run/
     comet_logger = None
@@ -53,12 +55,12 @@ def train(model: AutoencoderVQ,
 
     # Prepare gradient scaler, if autocast is used
     a_grad_scaler = None
-    if with_autocast:
+    if with_autocast or fp16:
         a_grad_scaler = GradScaler()
         
 
     # stablizing training on autoencoder
-    a_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 4000, args.lr / 10)
+    # a_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 4000, args.lr / 10)
 
     # initialize training step
     training_step = start_step
@@ -81,6 +83,7 @@ def train(model: AutoencoderVQ,
             # size of batch in dataloader
             batch_size = img.shape[0]
             img = img.float().to(model.device)
+            if fp16: img = img.half()
             x0, idx, vqloss = model.encode(img)
             
 
@@ -90,24 +93,21 @@ def train(model: AutoencoderVQ,
                 with autocast():
                     x0 = model.decode(x0)
                     r_loss = reconstruction_loss_fn(x0, img) + .25 * vqloss
-                if training_step % accumulate_gradients == accumulate_gradients - 1:
-                    a_grad_scaler.scale(loss_accumulate).backward()
-                    a_lr_scheduler.step()
-                    a_grad_scaler.step(optimizer)
-                    a_grad_scaler.update()
-                    loss_accumulate = 0
-                else:
-                    loss_accumulate += r_loss
+                a_grad_scaler.scale(r_loss).backward()
+                lr_scheduler.step()
+                a_grad_scaler.step(optimizer)
+                a_grad_scaler.update()
+                x0 = model.decode(x0)
+                r_loss = reconstruction_loss_fn(x0, img) + .25 *vqloss
+
             else:
                 x0 = model.decode(x0)
                 r_loss = reconstruction_loss_fn(x0, img) + .25 *vqloss
-                if training_step % accumulate_gradients == accumulate_gradients - 1:
-                    r_loss.backward()
-                    a_lr_scheduler.step()
-                    optimizer.step()
-                    loss_accumulate = 0
-                else:
-                    loss_accumulate += r_loss
+                if fp16: a_grad_scaler.scale(r_loss).backward()
+                else: r_loss.backward()
+                lr_scheduler.step()
+                optimizer.step()
+
             
             # log shit
             if (training_step + 1) % 50 == 0:
@@ -148,6 +148,7 @@ def parse_args():
     parser.add_argument('--beta1', type=float, required=False, default=.9, help='adam optimization algorithm\'s β1')
     parser.add_argument('--beta2', type=float, required=False, default=.99, help='adam optimization algorithm\'s β2')
     parser.add_argument('--autocast', action=argparse.BooleanOptionalAction, required=False, help='use automatic type casting')
+    parser.add_argument('--fp16', action=argparse.BooleanOptionalAction, help='use fp16 (don\'t use in conjunction with autocast). if specified, a L2 weight decay rate of 0.01 will be applied on the optimizer.')
     parser.add_argument('--from_ckpt', type=str, required=False, default=None, help='load model from checkpoint at specified path')
     parser.add_argument('--infer', action=argparse.BooleanOptionalAction, required=False, help='generate image instead of training')
     parser.add_argument('--epoch', type=int, required=False, default=100, help='number of training epochs')
@@ -168,10 +169,11 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     print(args)
-    model = AutoencoderVQ(16, quant_dim=32, codebook_size=8192)
-    model = model.cuda()
+    model = AutoencoderVQ(32, latent_space_channel_dim=4, codebook_size=8192)
+
     # model = LDM(unet, autoencoder, 256)
-    d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+    d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),
+                                weight_decay=0 if not args.fp16 else 0.01)
     
     if args.compile:
         model = torch.compile(model, backend='inductor', mode='reduce-overhead')
@@ -182,7 +184,7 @@ if __name__ == '__main__':
     if args.debug:
         x = torch.randn(1, 3, args.image_size, args.image_size).to(model.device)
         t = torch.randint(1, 1000, size=(1,)).to(model.device)
-        print(model(x)[0].shape) 
+        print(model.encode(x)[0].shape, model(x)[0].shape) 
         exit(0)
     start = 0
     step = 0
@@ -203,7 +205,7 @@ if __name__ == '__main__':
     else:
         raise ValueError("Inference requires a model checkpoint.")
 
-
+    assert not(args.autocast and args.fp16), "Only either autocast or fp16 should be used."
     if args.dataset_path is None: raise ValueError("Training expected a dataset path.")
     
 
@@ -214,11 +216,12 @@ if __name__ == '__main__':
                     return_original=False, transforms=T.Lambda(lambda t: (t * 2) - 1)),
         batch_size=args.batch_size, shuffle=True
     )
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(d_optim, 4000, args.lr / 10)
+    accelerator = Accelerator(gradient_accumulation_steps=args.accumulate_gradients)
+    model, d_optim, train_dataloader, lr_scheduler = accelerator.prepare(model, d_optim, train_dataloader, lr_scheduler)
 
-    
-
-    train(model, reconstruction_loss, d_optim, 
-            train_dataloader, with_autocast=args.autocast,
+    train(model, reconstruction_loss, d_optim, lr_scheduler,
+            train_dataloader, with_autocast=args.autocast, fp16=args.fp16,
         n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt, accumulate_gradients=args.accumulate_gradients)
 
             
