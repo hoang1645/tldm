@@ -36,8 +36,8 @@ class AutoencoderKL(Autoencoder):
     
     @autocast(enabled=False)
     def reg_loss(self, _input:torch.Tensor):
-        target = F.softmax(torch.randn_like(_input), dim=0)
-        return self.kl_penalty * self.regularization_loss.forward(F.log_softmax(_input, dim=0), target)
+        target = F.softmax(torch.randn_like(_input))
+        return self.kl_penalty * self.regularization_loss.forward(F.log_softmax(_input), target)
     
 class AutoencoderVQ(Autoencoder):
     def __init__(self, n_channels_init:int, latent_space_channel_dim:int=32,

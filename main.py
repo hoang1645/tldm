@@ -10,7 +10,7 @@ from comet_ml import Experiment
 # self-defined utilities
 from models.unet import UNet
 from models.diffuser import LDM
-from models.autoencoder.autoencoders_cnn import AutoencoderVQ
+from models.autoencoder.autoencoders_cnn import AutoencoderKL
 # progress bar
 from rich.console import Console
 from rich.progress import Progress, BarColumn, TextColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn, \
@@ -83,7 +83,8 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
             batch_size = img.shape[0]
             img = img.float().to(model.device)
             timesteps_tensor = torch.randint(1, timesteps, size=(batch_size,)).to(model.device)
-            x0, idx, vqloss = model.autoencoder.encode(img)
+            x0 = model.autoencoder.encode(img)
+            klloss = model.autoencoder.reg_loss(x0)
             x1, noise = model.forward_diffusion(x0.detach(), timesteps_tensor)
             
             diffusion_optimizer.zero_grad()
@@ -106,14 +107,14 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
             if with_autocast:
                 with autocast():
                     x0 = model.autoencoder.decode(x0)
-                    r_loss = reconstruction_loss_fn(x0, img) + .25 * vqloss
+                    r_loss = reconstruction_loss_fn(x0, img) + klloss
                 a_grad_scaler.scale(r_loss).backward()
                 a_lr_scheduler.step()
                 a_grad_scaler.step(autoencoder_optimizer)
                 a_grad_scaler.update()
             else:
                 x0 = model.autoencoder.decode(x0)
-                r_loss = reconstruction_loss_fn(x0, img) + .25 *vqloss
+                r_loss = reconstruction_loss_fn(x0, img) + klloss
                 r_loss.backward()
                 a_lr_scheduler.step()
                 autoencoder_optimizer.step()
@@ -179,8 +180,9 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    unet = UNet(in_chan=32, out_chan=32, embed_dim=128, n_attn_heads=8, dim_head=64, conv_init_chan=160, chan_mults=(1,2,4,4))
-    autoencoder = AutoencoderVQ(16, quant_dim=32, codebook_size=8192)
+    unet = UNet(in_chan=4, out_chan=4, embed_dim=128, n_attn_heads=8, dim_head=64, conv_init_chan=32, chan_mults=(1,2,4,4))
+    autoencoder = AutoencoderKL(32, latent_space_channel_dim=4, kl_penalty=1e-6)
+    autoencoder.load_state_dict(torch.load("checkpoints/AE-epoch=13_rloss=0.008027.pth")['state_dict'])
     model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.unet.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     a_optim = torch.optim.AdamW(model.autoencoder.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))

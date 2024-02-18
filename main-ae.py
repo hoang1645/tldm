@@ -197,7 +197,7 @@ if __name__ == '__main__':
         start = dicts['epoch']
         step = dicts['step']
         if not args.reset_optimizers:
-            d_optim.load_state_dict(dicts['optim'])
+            d_optim.load_state_dict(dicts['autoencoder_optim'])
 
         print("Loaded from checkpoint", args.from_ckpt)
 
