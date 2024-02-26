@@ -173,6 +173,8 @@ def parse_args():
     parser.add_argument('--reset_optimizers', action=argparse.BooleanOptionalAction)
     parser.add_argument('--save_ckpt', type=str, help='where to save checkpoints. defaults to the current directory.', required=False, default=None)
     # parser.add_argument('--update_discriminator_every_n_steps', type=int, required=False, default=1)
+    parser.add_argument('--comet_key', type=str, default=None, help="Comet API key, pass this when you want to use Comet logger")
+    parser.add_argument('--comet_proj', '-p', type=str, default=None, help="Comet API project name, pass this when you want to use Comet logger")
     return parser.parse_args()
 
 
@@ -233,7 +235,8 @@ if __name__ == '__main__':
 
         train(model, 1000, noise_loss, reconstruction_loss, d_optim, a_optim, 
               train_dataloader, with_autocast=args.autocast,
-            n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt)
+            n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt,
+            comet_api_key=args.comet_key, comet_project_name=args.comet_proj, log_comet=args.comet_key is not None)
 
     else:
         model.eval()
