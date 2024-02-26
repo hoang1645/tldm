@@ -65,7 +65,7 @@ class LDM(nn.Module):
     @torch.no_grad()
     def backward_diffusion_sampling(self, timesteps: int = 1000, num_images: int = 1, return_grid=True, n_image_per_row: int = 5) -> \
             Image.Image | List[Image.Image]:
-        x = torch.randn((num_images, 32, 16, 16), device=self.device)
+        x = torch.randn((num_images, 4, 16, 16), device=self.device)
         self.eval()
 
         pbar = Progress(TextColumn("Generating"), BarColumn(), MofNCompleteColumn(), TimeElapsedColumn(),
