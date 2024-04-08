@@ -63,9 +63,9 @@ class LDM(nn.Module):
         return ((tensors.clamp(-1, 1) + 1.0) / 2.0) * 255.0
 
     @torch.no_grad()
-    def backward_diffusion_sampling(self, timesteps: int = 1000, num_images: int = 1, return_grid=True, n_image_per_row: int = 5) -> \
+    def backward_diffusion_sampling(self, timesteps: int = 1000, num_images: int = 1, return_grid=True, n_image_per_row: int = 5, dtype=torch.float32) -> \
             Image.Image | List[Image.Image]:
-        x = torch.randn((num_images, 4, 16, 16), device=self.device)
+        x = torch.randn((num_images, 4, 16, 16), device=self.device, dtype=dtype)
         self.eval()
 
         pbar = Progress(TextColumn("Generating"), BarColumn(), MofNCompleteColumn(), TimeElapsedColumn(),
@@ -74,8 +74,8 @@ class LDM(nn.Module):
         task = pbar.add_task("", total=timesteps - 1)
         pbar.start()
         for time_step in range(timesteps - 1, 0, -1):
-            ts = torch.full((num_images,), time_step, device=self.device)
-            z = torch.randn_like(x) if time_step > 1 else torch.zeros_like(x)
+            ts = torch.full((num_images,), time_step, device=self.device, dtype=dtype)
+            z = torch.randn_like(x, dtype=dtype) if time_step > 1 else torch.zeros_like(x, dtype=dtype)
 
             predicted_noise = self(x, ts)
             beta_t = self.betas[time_step]

@@ -160,6 +160,7 @@ def parse_args():
     parser.add_argument('--beta1', type=float, required=False, default=.9, help='adam optimization algorithm\'s β1')
     parser.add_argument('--beta2', type=float, required=False, default=.99, help='adam optimization algorithm\'s β2')
     parser.add_argument('--autocast', action=argparse.BooleanOptionalAction, required=False, help='use automatic type casting')
+    parser.add_argument('--fp16', action=argparse.BooleanOptionalAction)
     parser.add_argument('--from_ckpt', type=str, required=False, default=None, help='load model from checkpoint at specified path')
     parser.add_argument('--infer', action=argparse.BooleanOptionalAction, required=False, help='generate image instead of training')
     parser.add_argument('--epoch', type=int, required=False, default=100, help='number of training epochs')
@@ -240,8 +241,15 @@ if __name__ == '__main__':
 
     else:
         model.eval()
-        with autocast(): image = model.backward_diffusion_sampling(num_images=5)
-        image.save('d:/gen-r.png')
+        if args.fp16: model.half()
+
+        if not args.fp16: 
+            with autocast(): image = model.backward_diffusion_sampling(num_images=5)
+        else: image = model.backward_diffusion_sampling(num_images=5, dtype=torch.half)
+        try:
+            image.save('d:/gen-r.png')
+        except FileNotFoundError:
+            image.save("/mnt/d/gen-r.png")
         if args.evaluate_fid:
             if args.evaluation_target is None:
                 raise ValueError('Expected evaluation target path when evaluating using FID is on')
