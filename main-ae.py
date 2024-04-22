@@ -39,7 +39,7 @@ def train(model: AutoencoderKL,
           train_dataloader: DataLoader,
           n_epoch: int = 100, start_from_epoch: int = 0, start_step: int = 0,
           with_autocast: bool = True, fp16:bool=False, log_comet: bool = False,
-          comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None, accumulate_gradients:int=1):
+          comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None, accelerator:Accelerator=None):
     if ckpt_save_path is None:
         ckpt_save_path = '.'
     # Prepare model
@@ -106,9 +106,10 @@ def train(model: AutoencoderKL,
                 x0 = model.decode(x0)
                 r_loss = reconstruction_loss_fn(x0, img) + klloss
                 if fp16: a_grad_scaler.scale(r_loss).backward()
-                else: r_loss.backward()
-                lr_scheduler.step()
+                else: accelerator.backward(r_loss)
                 optimizer.step()
+                lr_scheduler.step()
+                
 
             
             # log shit
@@ -224,6 +225,6 @@ if __name__ == '__main__':
 
     train(model, reconstruction_loss, d_optim, lr_scheduler,
             train_dataloader, with_autocast=args.autocast, fp16=args.fp16,
-        n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt, accumulate_gradients=args.accumulate_gradients)
+        n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt, accumulate_gradients=accelerator)
 
             

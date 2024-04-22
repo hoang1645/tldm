@@ -45,10 +45,11 @@ class AutoencoderVQ(Autoencoder):
         super().__init__(n_channels_init, latent_space_channel_dim)
         quant_dim = latent_space_channel_dim
         self.codebook_size = codebook_size
-        self.vquantizer = VectorQuantize(quant_dim, self.codebook_size, channel_last=False, ema_update=True)
+        self.vquantizer = VectorQuantize(quant_dim, self.codebook_size, channel_last=False, ema_update=False, learnable_codebook=True)
         self.quant_conv = nn.Conv2d(latent_space_channel_dim, quant_dim, 1)
         self.post_quant_conv = nn.Conv2d(quant_dim, latent_space_channel_dim, 1)
         self.device = 'cuda'
+        # print(self.vquantizer.codebook, self.vquantizer.codebook.shape)
 
     def encode(self, x:torch.Tensor):
         dtype = x.dtype
@@ -58,6 +59,7 @@ class AutoencoderVQ(Autoencoder):
         x = rearrange(x, "b c h w -> b c (h w)")
         x = x.float()
         x, idx, loss = self.vquantizer.forward(x)
+        # self.vquantizer.get_codes_from_indices: the lookup function
         x = x.to(dtype)
         loss = loss.to(dtype)
         x = rearrange(x, "b c (h w) -> b c h w", h=h)
@@ -76,3 +78,9 @@ class AutoencoderVQ(Autoencoder):
     def reg_loss(self, _input:torch.Tensor):
         _, _, loss = self.vquantizer(_input)
         return loss
+
+# ae = AutoencoderVQ(4)
+# imp = torch.randn((4, 3, 256, 256))
+# x, idx, _ = ae.encode(imp)
+# y = ae.vquantizer.get_output_from_indices(idx).reshape(x.shape)
+# print(torch.isclose(x, y))

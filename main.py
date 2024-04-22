@@ -90,7 +90,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
             diffusion_optimizer.zero_grad()
 
             if with_autocast:
-                with autocast():
+                with autocast(dtype=torch.bfloat16):
                     x1 = model.forward(x1, timesteps_tensor)
                     d_loss = diffusion_loss_fn(x1, noise)
                 d_grad_scaler.scale(d_loss).backward()
