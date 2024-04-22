@@ -215,6 +215,6 @@ if __name__ == '__main__':
 
     train(model, reconstruction_loss, d_optim, lr_scheduler,
             train_dataloader, with_autocast=args.autocast, fp16=args.fp16,
-        n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt, accumulate_gradients=accelerator)
+        n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt, accelerator=accelerator)
 
             
