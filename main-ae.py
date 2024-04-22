@@ -157,7 +157,7 @@ def parse_args():
     parser.add_argument('--accumulate_gradients', '-a', type=int, default=1, help='number of gradient accumulation steps, default=1 (no accumulation)')
     # parser.add_argument('--update_discriminator_every_n_steps', type=int, required=False, default=1)
     return parser.parse_args()
-
+    
 
 if __name__ == '__main__':
     args = parse_args()
@@ -181,7 +181,7 @@ if __name__ == '__main__':
         exit(0)
     start = 0
     step = 0
-
+    
     if args.from_ckpt is not None:
         dicts = torch.load(args.from_ckpt)
         model.load_state_dict(dicts['state_dict'], strict=False)
@@ -212,7 +212,7 @@ if __name__ == '__main__':
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(d_optim, 4000, args.lr / 10)
     accelerator = Accelerator(gradient_accumulation_steps=args.accumulate_gradients)
     model, d_optim, train_dataloader, lr_scheduler = accelerator.prepare(model, d_optim, train_dataloader, lr_scheduler)
-
+    accelerator.save_state()
     train(model, reconstruction_loss, d_optim, lr_scheduler,
             train_dataloader, with_autocast=args.autocast, fp16=args.fp16,
         n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt, accelerator=accelerator)
