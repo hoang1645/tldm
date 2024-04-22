@@ -84,32 +84,22 @@ def train(model: AutoencoderKL,
             batch_size = img.shape[0]
             img = img.float().to(model.device)
             if fp16: img = img.half()
-            if autocast():
-                with autocast():
-                    x0 = model.encode(img)
-                    klloss = model.reg_loss(x0)
-            else:
-                x0 = model.encode(img)
-                klloss = model.reg_loss(x0)
+            # if with_autocast():
+            #     with autocast():
+            #         x0 = model.encode(img)
+            #         klloss = model.reg_loss(x0)
+            # else:
+            #     x0 = model.encode(img)
+            #     klloss = model.reg_loss(x0)
             optimizer.zero_grad()
 
-            if with_autocast:
-                with autocast():
-                    x0 = model.decode(x0)
-                    r_loss = reconstruction_loss_fn(x0, img) + klloss
-                a_grad_scaler.scale(r_loss).backward()
-                lr_scheduler.step()
-                a_grad_scaler.step(optimizer)
-                a_grad_scaler.update()
-
-            else:
-                x0 = model.decode(x0)
-                r_loss = reconstruction_loss_fn(x0, img) + klloss
-                if fp16: a_grad_scaler.scale(r_loss).backward()
-                else: accelerator.backward(r_loss)
-                optimizer.step()
-                lr_scheduler.step()
-                
+            
+            x0, klloss = model(img)
+            r_loss = reconstruction_loss_fn(x0, img) + klloss
+            accelerator.backward(r_loss)
+            optimizer.step()
+            lr_scheduler.step()
+            
 
             
             # log shit
