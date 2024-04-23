@@ -188,7 +188,7 @@ if __name__ == '__main__':
     autoencoder.load_state_dict(torch.load("checkpoints/AE-epoch=20_rloss=0.0406.pth")['state_dict'])
     model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.unet.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
-    a_optim = torch.optim.AdamW(model.autoencoder.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+    a_optim = torch.optim.AdamW(model.autoencoder.parameters(), lr=5e-6, betas=(args.beta1, args.beta2))
     if args.compile:
         model = torch.compile(model, backend='inductor', mode='reduce-overhead')
     
