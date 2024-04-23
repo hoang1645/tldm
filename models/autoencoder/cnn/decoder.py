@@ -5,18 +5,18 @@ from .residual import ResBlock
 
 
 class LatentSpaceDecoder(nn.Module):
-    def __init__(self, n_channels_init:int, in_chan:int=32, out_chan:int=3, num_layers_main=3):
+    def __init__(self, n_channels_init:int, in_chan:int=32, out_chan:int=3):
         super().__init__()
         self.init_conv = nn.Sequential(
             nn.Conv2d(in_chan, n_channels_init, 3, padding=1),
             nn.SiLU()
         )
         self.residual_blocks = nn.Sequential(*[
-            self.__make_block(n_channels_init << i, 2*i + 4) for i in range(num_layers_main - 1)
+            self.__make_block(n_channels_init << i, 2*i + 4) for i in range(2)
         ])
         self.final_block = nn.Sequential(
-            ResBlock(n_channels_init << (num_layers_main - 1), 2 * num_layers_main + 2, F.relu6),
-            self.__upscale_block(n_channels_init << (num_layers_main - 1), n_channels_init)
+            ResBlock(n_channels_init << 2, 8, F.relu6),
+            self.__upscale_block(n_channels_init << 2, n_channels_init)
         )
         self.final_conv = nn.Sequential(
             nn.Conv2d(n_channels_init, out_chan, 3, padding='same'),
