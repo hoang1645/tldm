@@ -5,7 +5,7 @@ from .residual import ResBlock
 
 
 class LatentSpaceDecoder(nn.Module):
-    def __init__(self, n_channels_init:int, in_chan:int=32, out_chan:int=3, num_layers_main=4):
+    def __init__(self, n_channels_init:int, in_chan:int=32, out_chan:int=3, num_layers_main=3):
         super().__init__()
         self.init_conv = nn.Sequential(
             nn.Conv2d(in_chan, n_channels_init, 3, padding=1),
