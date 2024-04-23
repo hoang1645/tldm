@@ -175,6 +175,7 @@ if __name__ == '__main__':
 
     summary(model, verbose=1)
     if args.debug:
+        model.cuda()
         x = torch.randn(1, 3, args.image_size, args.image_size).to(model.device)
         t = torch.randint(1, 1000, size=(1,)).to(model.device)
         print(model.encode(x)[0].shape, model(x)[0].shape) 
@@ -212,7 +213,7 @@ if __name__ == '__main__':
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(d_optim, 4000, args.lr / 10)
     accelerator = Accelerator(gradient_accumulation_steps=args.accumulate_gradients)
     model, d_optim, train_dataloader, lr_scheduler = accelerator.prepare(model, d_optim, train_dataloader, lr_scheduler)
-    accelerator.save_state()
+
     train(model, reconstruction_loss, d_optim, lr_scheduler,
             train_dataloader, with_autocast=args.autocast, fp16=args.fp16,
         n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt, accelerator=accelerator)
