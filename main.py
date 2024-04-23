@@ -183,7 +183,7 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    unet = UNet(in_chan=4, out_chan=4, embed_dim=128, n_attn_heads=16, dim_head=64, conv_init_chan=128, chan_mults=(1,2,4,4))
+    unet = UNet(in_chan=4, out_chan=4, embed_dim=128, n_attn_heads=16, dim_head=64, conv_init_chan=192, chan_mults=(1,2,4,4))
     autoencoder = AutoencoderKL(32, latent_space_channel_dim=4, kl_penalty=1e-6)
     autoencoder.load_state_dict(torch.load("checkpoints/AE-epoch=20_rloss=0.0406.pth")['state_dict'])
     model = LDM(unet, autoencoder, 256)
