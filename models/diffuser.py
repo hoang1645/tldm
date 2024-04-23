@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from .unet import UNet
-from .autoencoder.autoencoders import AutoencoderVQ
+from .autoencoder.autoencoders import AutoencoderKL
 from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn, TimeElapsedColumn, MofNCompleteColumn
 import torchvision.transforms.v2.functional as TF
 from torchvision.utils import make_grid
@@ -11,7 +11,7 @@ from typing import List
 
 
 class LDM(nn.Module):
-    def __init__(self, unet: UNet, autoencoder: AutoencoderVQ,
+    def __init__(self, unet: UNet, autoencoder: AutoencoderKL,
                  image_size: int, image_channels: int = 32, n_diffusion_steps: int = 1000,
                  device: str | torch.device = 'cuda', inverse_scale_transform: bool = True):
         super().__init__()
