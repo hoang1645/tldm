@@ -72,10 +72,10 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
         # progress bar
         pbar = Progress(TextColumn("[green]Epoch {}/{}".format(epoch, n_epoch)), BarColumn(), MofNCompleteColumn(),
                         TimeElapsedColumn(), TextColumn("||"), TimeRemainingColumn(),
-                        TextColumn("loss = {task.fields[loss]:.4}, reconstruction loss = {task.fields[rloss]:.4}"), console=console,
+                        TextColumn("loss = {task.fields[loss]:.4}, reconstruction loss = {task.fields[rloss]:.4}, alr = {task.fields[alr]}"), console=console,
                         transient=True)
 
-        task = pbar.add_task("", total=len(train_dataloader), loss=0.0, rloss=.0)
+        task = pbar.add_task("", total=len(train_dataloader), loss=0.0, rloss=.0, alr=0.)
         pbar.start()
         # train
         for img in train_dataloader:
@@ -129,7 +129,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
 
             losses.append(d_loss.item())
             rlosses.append(r_loss.item())
-            pbar.update(task, advance=1, loss=d_loss.item(), rloss=r_loss.item())
+            pbar.update(task, advance=1, loss=d_loss.item(), rloss=r_loss.item(), alr=autoencoder_optimizer.state_dict()['param_groups'][0]['lr'])
             training_step += 1
 
         # summarize and save checkpoint
@@ -137,7 +137,9 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
         state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": model.state_dict(),
                       "diffusion_optim": diffusion_optimizer.state_dict(),
                       "autoencoder_optim": autoencoder_optimizer.state_dict()}
+        if hasattr(model, "_orig_mod"): state_dict['state_dict'] = model._orig_mod.state_dict()
         console.print("Saving checkpoint...")
+        
         torch.save(state_dict, os.path.join(ckpt_save_path,
                                             "checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth".format(
             epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item())))
@@ -190,8 +192,8 @@ if __name__ == '__main__':
     d_optim = torch.optim.AdamW(model.unet.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     a_optim = torch.optim.AdamW(model.autoencoder.parameters(), lr=5e-6, betas=(args.beta1, args.beta2))
     if args.compile:
-        model = torch.compile(model, backend='inductor', mode='reduce-overhead')
-    
+        model = torch.compile(model, backend='inductor')
+        print(dir(model))
     print("Model initialized")
 
     summary(model, verbose=1)
@@ -205,7 +207,8 @@ if __name__ == '__main__':
 
     if args.from_ckpt is not None:
         dicts = torch.load(args.from_ckpt)
-        model.load_state_dict(dicts['state_dict'], strict=False)
+        if args.compile: model._orig_mod.load_state_dict(dicts['state_dict'], strict=True)
+        else: model.load_state_dict(dicts['state_dict'], strict=True)
         start = dicts['epoch']
         step = dicts['step']
         if not args.reset_optimizers:
@@ -229,7 +232,7 @@ if __name__ == '__main__':
         train_dataloader = DataLoader(
             PixivDataset(args.dataset_path, imageSize=256,
                         return_original=False, transforms=T.Lambda(lambda t: (t * 2) - 1)),
-            batch_size=args.batch_size, shuffle=True
+            batch_size=args.batch_size, shuffle=True, drop_last=args.compile
         )
 
         
