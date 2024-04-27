@@ -10,7 +10,7 @@ from comet_ml import Experiment
 # self-defined utilities
 from models.unet import UNet
 from models.diffuser import LDM
-from models.autoencoder.autoencoders_cnn import AutoencoderKL
+from diffusers import AutoencoderKL
 # progress bar
 from rich.console import Console
 from rich.progress import Progress, BarColumn, TextColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn, \
@@ -72,10 +72,10 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
         # progress bar
         pbar = Progress(TextColumn("[green]Epoch {}/{}".format(epoch, n_epoch)), BarColumn(), MofNCompleteColumn(),
                         TimeElapsedColumn(), TextColumn("||"), TimeRemainingColumn(),
-                        TextColumn("loss = {task.fields[loss]:.4}, reconstruction loss = {task.fields[rloss]:.4}, alr = {task.fields[alr]}"), console=console,
+                        TextColumn("loss = {task.fields[loss]:.4}, reconstruction loss = {task.fields[rloss]:.4}"), console=console,
                         transient=True)
 
-        task = pbar.add_task("", total=len(train_dataloader), loss=0.0, rloss=.0, alr=0.)
+        task = pbar.add_task("", total=len(train_dataloader), loss=0.0, rloss=.0)
         pbar.start()
         # train
         for img in train_dataloader:
@@ -83,8 +83,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
             batch_size = img.shape[0]
             img = img.float().to(model.device)
             timesteps_tensor = torch.randint(1, timesteps, size=(batch_size,)).to(model.device)
-            x0 = model.autoencoder.encode(img)
-            klloss = model.autoencoder.reg_loss(x0)
+            x0 = model.autoencoder.encode(img).latent_dist.mode()
             x1, noise = model.forward_diffusion(x0.detach(), timesteps_tensor)
             
             diffusion_optimizer.zero_grad()
@@ -106,15 +105,15 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
 
             if with_autocast:
                 with autocast():
-                    x0 = model.autoencoder.decode(x0)
-                    r_loss = reconstruction_loss_fn(x0, img) + klloss
+                    x0 = model.autoencoder.decode(x0).sample
+                    r_loss = reconstruction_loss_fn(x0, img)
                 a_grad_scaler.scale(r_loss).backward()
                 a_lr_scheduler.step()
                 a_grad_scaler.step(autoencoder_optimizer)
                 a_grad_scaler.update()
             else:
-                x0 = model.autoencoder.decode(x0)
-                r_loss = reconstruction_loss_fn(x0, img) + klloss
+                x0 = model.autoencoder.decode(x0).sample
+                r_loss = reconstruction_loss_fn(x0, img)
                 r_loss.backward()
                 a_lr_scheduler.step()
                 autoencoder_optimizer.step()
@@ -129,7 +128,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
 
             losses.append(d_loss.item())
             rlosses.append(r_loss.item())
-            pbar.update(task, advance=1, loss=d_loss.item(), rloss=r_loss.item(), alr=autoencoder_optimizer.state_dict()['param_groups'][0]['lr'])
+            pbar.update(task, advance=1, loss=d_loss.item(), rloss=r_loss.item())
             training_step += 1
 
         # summarize and save checkpoint
@@ -137,9 +136,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
         state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": model.state_dict(),
                       "diffusion_optim": diffusion_optimizer.state_dict(),
                       "autoencoder_optim": autoencoder_optimizer.state_dict()}
-        if hasattr(model, "_orig_mod"): state_dict['state_dict'] = model._orig_mod.state_dict()
         console.print("Saving checkpoint...")
-        
         torch.save(state_dict, os.path.join(ckpt_save_path,
                                             "checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth".format(
             epoch=epoch, d_loss=d_loss.item(), r_loss=r_loss.item())))
@@ -186,14 +183,13 @@ if __name__ == '__main__':
     print(args)
 
     unet = UNet(in_chan=4, out_chan=4, embed_dim=128, n_attn_heads=16, dim_head=64, conv_init_chan=192, chan_mults=(1,2,4,4))
-    autoencoder = AutoencoderKL(128, latent_space_channel_dim=4, kl_penalty=1e-6)
-    autoencoder.load_state_dict(torch.load("checkpoints/AE-epoch=20_rloss=0.0406.pth")['state_dict'])
+    autoencoder = AutoencoderKL.from_single_file("https://huggingface.co/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors")
+    # autoencoder.load_state_dict(torch.load("checkpoints/AE-epoch=20_rloss=0.0406.pth")['state_dict'])
     model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.unet.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     a_optim = torch.optim.AdamW(model.autoencoder.parameters(), lr=5e-6, betas=(args.beta1, args.beta2))
     if args.compile:
-        model = torch.compile(model, backend='inductor')
-        print(dir(model))
+        model = torch.compile(model, backend='inductor', mode='reduce-overhead')
     print("Model initialized")
 
     summary(model, verbose=1)
@@ -207,8 +203,7 @@ if __name__ == '__main__':
 
     if args.from_ckpt is not None:
         dicts = torch.load(args.from_ckpt)
-        if args.compile: model._orig_mod.load_state_dict(dicts['state_dict'], strict=True)
-        else: model.load_state_dict(dicts['state_dict'], strict=True)
+        model.load_state_dict(dicts['state_dict'], strict=False)
         start = dicts['epoch']
         step = dicts['step']
         if not args.reset_optimizers:
@@ -232,7 +227,7 @@ if __name__ == '__main__':
         train_dataloader = DataLoader(
             PixivDataset(args.dataset_path, imageSize=256,
                         return_original=False, transforms=T.Lambda(lambda t: (t * 2) - 1)),
-            batch_size=args.batch_size, shuffle=True, drop_last=args.compile
+            batch_size=args.batch_size, shuffle=True
         )
 
         
