@@ -39,6 +39,8 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
           n_epoch: int = 100, start_from_epoch: int = 0, start_step: int = 0,
           with_autocast: bool = True, fp16: bool=False, log_comet: bool = False,
           comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None):
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
     if ckpt_save_path is None:
         ckpt_save_path = '.'
     # Prepare model
