@@ -30,7 +30,7 @@ class AutoencoderKL(Autoencoder):
     def __init__(self,  n_channels_init:int, latent_space_channel_dim:int=32,
                  kl_penalty:float=1e-6):
         super().__init__(n_channels_init, latent_space_channel_dim)
-        self.regularization_loss = nn.KLDivLoss(False)
+        self.regularization_loss = nn.KLDivLoss(reduction="batchmean")
         self.kl_penalty = kl_penalty
         self.device = 'cuda'
     
