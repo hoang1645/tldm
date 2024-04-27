@@ -162,7 +162,7 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     print(args)
-    model = AutoencoderKL(128, latent_space_channel_dim=4, kl_penalty=1e-6)
+    model = AutoencoderKL(64, latent_space_channel_dim=4, kl_penalty=1e-6)
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),
