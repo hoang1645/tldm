@@ -234,7 +234,7 @@ if __name__ == '__main__':
         train_dataloader = DataLoader(
             PixivDataset(args.dataset_path, imageSize=256,
                         return_original=False, transforms=T.Lambda(lambda t: (t * 2) - 1)),
-            batch_size=args.batch_size, shuffle=True, drop_last=args.compile
+            batch_size=args.batch_size, shuffle=True, drop_last=args.compile==True
         )
 
         
