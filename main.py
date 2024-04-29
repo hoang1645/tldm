@@ -60,7 +60,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
         d_grad_scaler = GradScaler()
 
     # stablizing training on autoencoder
-    a_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(autoencoder_optimizer, 4000, args.lr / 10)
+    a_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(autoencoder_optimizer, 4000, 1e-6)
 
     # initialize training step
     training_step = start_step

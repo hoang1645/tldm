@@ -125,6 +125,60 @@ def train(model: AutoencoderKL,
         console.print(f"Checkpoint saved at [i]{os.path.join(ckpt_save_path, 'checkpoints/AE-epoch={epoch}_rloss={r_loss:.4}.pth'.format(epoch=epoch, r_loss=r_loss.item()))}[/i]")
         pbar.stop()
 
+def evaluate(model: AutoencoderKL,
+          reconstruction_loss_fn: nn.Module | Callable[..., torch.Tensor],
+          optimizer: torch.optim.Optimizer, lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
+          train_dataloader: DataLoader,
+          n_epoch: int = 100, start_from_epoch: int = 0, start_step: int = 0,
+          with_autocast: bool = True, fp16:bool=False, log_comet: bool = False,
+          comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None, accelerator:Accelerator=None):
+    
+    model = model.eval()
+    if fp16: model = model.half()
+    # initialize loggers
+    
+        
+
+    
+    # console for rich
+    console = Console()
+    loss_accumulate = 0.0
+    with torch.no_grad():
+        # save losses for logging to console
+        rlosses = []
+        # progress bar
+        pbar = Progress(TextColumn("[green]Evaluating"), BarColumn(), MofNCompleteColumn(),
+                        TimeElapsedColumn(), TextColumn("||"), TimeRemainingColumn(),
+                        TextColumn("loss = {task.fields[loss]:.4}, reconstruction loss = {task.fields[rloss]:.4}"), console=console,
+                        transient=True)
+        task = pbar.add_task("", total=len(train_dataloader), loss=0.0, rloss=.0)
+        pbar.start()
+        # train
+        for i, img in enumerate(train_dataloader):
+            if i == 1000: break
+            # size of batch in dataloader
+            batch_size = img.shape[0]
+            if fp16: img = img.to(model.device).half()
+            else: img = img.float().to(model.device)
+            # if with_autocast():
+            #     with autocast():
+            #         x0 = model.encode(img)
+            #         klloss = model.reg_loss(x0)
+            # else:
+            #     x0 = model.encode(img)
+            #     klloss = model.reg_loss(x0)
+            x0 = model(img).sample
+            r_loss = reconstruction_loss_fn(x0, img)
+            
+            rlosses.append(r_loss.item())
+            pbar.update(task, advance=1, loss=0., rloss=r_loss.item())
+           
+
+        # summarize and save checkpoint
+        console.print(f"Evaluation complete, reconstruction loss = {sum(rlosses) / len(rlosses)}.")
+        pbar.stop()
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str, required=False, default=None)
@@ -155,6 +209,7 @@ def parse_args():
     parser.add_argument('--reset_optimizers', action=argparse.BooleanOptionalAction)
     parser.add_argument('--save_ckpt', type=str, help='where to save checkpoints. defaults to the current directory.', required=False, default=None)
     parser.add_argument('--accumulate_gradients', '-a', type=int, default=1, help='number of gradient accumulation steps, default=1 (no accumulation)')
+    parser.add_argument('--validate', '-v', action='store_true')
     # parser.add_argument('--update_discriminator_every_n_steps', type=int, required=False, default=1)
     return parser.parse_args()
     
@@ -184,7 +239,7 @@ if __name__ == '__main__':
     step = 0
     
     if args.from_ckpt is not None:
-        dicts = torch.load(args.from_ckpt)
+        dicts = torch.load(args.from_ckpt, map_location="cuda:0")
         model.load_state_dict(dicts['state_dict'], strict=False)
         start = dicts['epoch']
         step = dicts['step']
@@ -214,7 +269,11 @@ if __name__ == '__main__':
     accelerator = Accelerator(gradient_accumulation_steps=args.accumulate_gradients)
     model, d_optim, train_dataloader, lr_scheduler = accelerator.prepare(model, d_optim, train_dataloader, lr_scheduler)
 
-    train(model, reconstruction_loss, d_optim, lr_scheduler,
+    if args.validate:
+        evaluate(model, reconstruction_loss, d_optim, lr_scheduler,
+            train_dataloader, with_autocast=args.autocast, fp16=args.fp16,
+        n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt, accelerator=accelerator)
+    else: train(model, reconstruction_loss, d_optim, lr_scheduler,
             train_dataloader, with_autocast=args.autocast, fp16=args.fp16,
         n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt, accelerator=accelerator)
 
