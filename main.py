@@ -86,10 +86,17 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
             batch_size = img.shape[0]
             img = img.float().to(model.device)
             timesteps_tensor = torch.randint(1, timesteps, size=(batch_size,)).to(model.device)
-            x0 = model.autoencoder.encode(img).latent_dist.mode()
-            x1, noise = model.forward_diffusion(x0.detach(), timesteps_tensor)
             
             diffusion_optimizer.zero_grad()
+            if freeze_autoencoder:
+                with torch.no_grad():
+                    x0 = model.autoencoder.encode(img).latent_dist.mode()
+                    x1, noise = model.forward_diffusion(x0.detach(), timesteps_tensor)
+            
+            else:
+                x0 = model.autoencoder.encode(img).latent_dist.mode()
+                x1, noise = model.forward_diffusion(x0.detach(), timesteps_tensor)
+
 
             if with_autocast:
                 with autocast(dtype=torch.bfloat16):
@@ -103,26 +110,35 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
                 d_loss = diffusion_loss_fn(x1, noise)
                 d_loss.backward()
                 diffusion_optimizer.step()
+            
 
-            autoencoder_optimizer.zero_grad()
+            if freeze_autoencoder:
+                with torch.no_grad():
+                    if with_autocast:
+                        with autocast(dtype=torch.bfloat16):
+                            x0 = model.autoencoder.decode(x0).sample
+                            r_loss = reconstruction_loss_fn(x0, img)
+                    else:
+                        x0 = model.autoencoder.decode(x0).sample
+                        r_loss = reconstruction_loss_fn(x0, img)
+            else:
+                autoencoder_optimizer.zero_grad()
 
-            if with_autocast:
-                with autocast():
+                if with_autocast:
+                    with autocast():
+                        x0 = model.autoencoder.decode(x0).sample
+                        r_loss = reconstruction_loss_fn(x0, img)
+                        a_grad_scaler.scale(r_loss).backward()
+                        a_lr_scheduler.step()
+                        a_grad_scaler.step(autoencoder_optimizer)
+                        a_grad_scaler.update()
+                else:
                     x0 = model.autoencoder.decode(x0).sample
                     r_loss = reconstruction_loss_fn(x0, img)
-                if not freeze_autoencoder:
-                    a_grad_scaler.scale(r_loss).backward()
-                    a_lr_scheduler.step()
-                    a_grad_scaler.step(autoencoder_optimizer)
-                    a_grad_scaler.update()
-            else:
-                x0 = model.autoencoder.decode(x0).sample
-                r_loss = reconstruction_loss_fn(x0, img)
-                if not freeze_autoencoder:
                     r_loss.backward()
                     a_lr_scheduler.step()
                     autoencoder_optimizer.step()
-            
+                
             # log shit
             if (training_step + 1) % 50 == 0:
                 tensorboard_logger.add_scalar('d_loss', d_loss, training_step)
