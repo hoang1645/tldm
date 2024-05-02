@@ -10,7 +10,7 @@ from comet_ml import Experiment
 # self-defined utilities
 from models.unet import UNet
 from models.diffuser import LDM
-from models.autoencoder.autoencoders_cnn import AutoencoderVQ, AutoencoderKL
+from diffusers import AutoencoderKL
 # progress bar
 from rich.console import Console
 from rich.progress import Progress, BarColumn, TextColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn, \
@@ -94,8 +94,8 @@ def train(model: AutoencoderKL,
             optimizer.zero_grad()
 
             
-            x0, klloss = model(img)
-            r_loss = reconstruction_loss_fn(x0, img) + klloss
+            x0 = model(img).sample
+            r_loss = reconstruction_loss_fn(x0, img)
             accelerator.backward(r_loss)
             optimizer.step()
             lr_scheduler.step()
@@ -217,7 +217,9 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     print(args)
-    model = AutoencoderKL(32, latent_space_channel_dim=4, kl_penalty=1e-6)
+
+    model = AutoencoderKL.from_single_file("https://huggingface.co/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors")
+    autoencoder.load_state_dict(torch.load("checkpoints/sd-ae-1epoch.pth")['state_dict'])
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),

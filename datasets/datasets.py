@@ -17,9 +17,7 @@ class PixivDataset(Dataset):
                  T.Resize([imageSize, imageSize], T.InterpolationMode.BICUBIC, antialias=True), transforms])
         else:
             self.transform = T.Compose([T.ToImage(), T.ToDtype(torch.float32, scale=True),
-                T.Resize([imageSize, imageSize], T.InterpolationMode.BICUBIC, antialias=True),
-                transforms
-            ])
+                T.Resize([imageSize, imageSize], T.InterpolationMode.BICUBIC, antialias=True)])
 
         self.imagePath = imagePath
         self.imageSize = imageSize
