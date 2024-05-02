@@ -38,13 +38,14 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
           train_dataloader: DataLoader,
           n_epoch: int = 100, start_from_epoch: int = 0, start_step: int = 0,
           with_autocast: bool = True, fp16: bool=False, log_comet: bool = False,
-          comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None):
+          comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None, freeze_autoencoder:bool=False):
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
     if ckpt_save_path is None:
         ckpt_save_path = '.'
     # Prepare model
     model = model.train()
+    if freeze_autoencoder: model.autoencoder.requires_grad_(False)
     # initialize loggers
     tensorboard_logger = SummaryWriter()  # log saved at run/
     comet_logger = None
@@ -178,6 +179,7 @@ def parse_args():
     parser.add_argument('--reset_optimizers', action=argparse.BooleanOptionalAction)
     parser.add_argument('--save_ckpt', type=str, help='where to save checkpoints. defaults to the current directory.', required=False, default=None)
     # parser.add_argument('--update_discriminator_every_n_steps', type=int, required=False, default=1)
+    parser.add_argument("--freeze_autoencoder", action='store_true')
     parser.add_argument('--comet_key', type=str, default=None, help="Comet API key, pass this when you want to use Comet logger")
     parser.add_argument('--comet_proj', '-p', type=str, default=None, help="Comet API project name, pass this when you want to use Comet logger")
     return parser.parse_args()
@@ -243,7 +245,7 @@ if __name__ == '__main__':
         train(model, 1000, noise_loss, reconstruction_loss, d_optim, a_optim, 
               train_dataloader, with_autocast=args.autocast,
             n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt,
-            comet_api_key=args.comet_key, comet_project_name=args.comet_proj, log_comet=args.comet_key is not None)
+            comet_api_key=args.comet_key, comet_project_name=args.comet_proj, log_comet=args.comet_key is not None, freeze_autoencoder=args.freeze_autoencoder)
 
     else:
         model.eval()
