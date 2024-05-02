@@ -205,7 +205,7 @@ if __name__ == '__main__':
     print(args)
 
 
-    unet = UNet(in_chan=4, out_chan=4, embed_dim=1024, n_attn_heads=16, dim_head=64, conv_init_chan=256, chan_mults=(1,2,4,4),
+    unet = UNet(in_chan=4, out_chan=4, embed_dim=1024, n_attn_heads=10, dim_head=64, conv_init_chan=160, chan_mults=(1,2,4,4),
                 where_attn=(False, True, True, True), norm_groups=16)
 
     autoencoder = AutoencoderKL.from_config("stabilityai/sd-vae-ft-mse")
