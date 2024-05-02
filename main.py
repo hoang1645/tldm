@@ -38,11 +38,14 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
           train_dataloader: DataLoader,
           n_epoch: int = 100, start_from_epoch: int = 0, start_step: int = 0,
           with_autocast: bool = True, fp16: bool=False, log_comet: bool = False,
-          comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None):
+          comet_api_key: str = None, comet_project_name: str = None, ckpt_save_path:str=None, freeze_autoencoder:bool=False):
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
     if ckpt_save_path is None:
         ckpt_save_path = '.'
     # Prepare model
     model = model.train()
+    if freeze_autoencoder: model.autoencoder.requires_grad_(False)
     # initialize loggers
     tensorboard_logger = SummaryWriter()  # log saved at run/
     comet_logger = None
@@ -58,7 +61,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
         d_grad_scaler = GradScaler()
 
     # stablizing training on autoencoder
-    a_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(autoencoder_optimizer, 4000, args.lr / 10)
+    a_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(autoencoder_optimizer, 4000, 1e-6)
 
     # initialize training step
     training_step = start_step
@@ -173,6 +176,7 @@ def parse_args():
     parser.add_argument('--reset_optimizers', action=argparse.BooleanOptionalAction)
     parser.add_argument('--save_ckpt', type=str, help='where to save checkpoints. defaults to the current directory.', required=False, default=None)
     # parser.add_argument('--update_discriminator_every_n_steps', type=int, required=False, default=1)
+    parser.add_argument("--freeze_autoencoder", action='store_true')
     parser.add_argument('--comet_key', type=str, default=None, help="Comet API key, pass this when you want to use Comet logger")
     parser.add_argument('--comet_proj', '-p', type=str, default=None, help="Comet API project name, pass this when you want to use Comet logger")
     return parser.parse_args()
@@ -182,9 +186,13 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    unet = UNet(in_chan=4, out_chan=4, embed_dim=128, n_attn_heads=16, dim_head=64, conv_init_chan=192, chan_mults=(1,2,4,4))
+
+    unet = UNet(in_chan=4, out_chan=4, embed_dim=1024, n_attn_heads=16, dim_head=64, conv_init_chan=256, chan_mults=(1,2,4,4),
+                where_attn=(False, True, True, True), norm_groups=16)
+
     autoencoder = AutoencoderKL.from_single_file("https://huggingface.co/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors")
-    # autoencoder.load_state_dict(torch.load("checkpoints/AE-epoch=20_rloss=0.0406.pth")['state_dict'])
+    autoencoder.load_state_dict(torch.load("checkpoints/sd-ae-1epoch.pth")['state_dict'])
+    
     model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.unet.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     a_optim = torch.optim.AdamW(model.autoencoder.parameters(), lr=5e-6, betas=(args.beta1, args.beta2))
@@ -227,7 +235,7 @@ if __name__ == '__main__':
         train_dataloader = DataLoader(
             PixivDataset(args.dataset_path, imageSize=256,
                         return_original=False, transforms=T.Lambda(lambda t: (t * 2) - 1)),
-            batch_size=args.batch_size, shuffle=True
+          batch_size=args.batch_size, shuffle=True, drop_last=args.compile==True
         )
 
         
@@ -235,7 +243,7 @@ if __name__ == '__main__':
         train(model, 1000, noise_loss, reconstruction_loss, d_optim, a_optim, 
               train_dataloader, with_autocast=args.autocast,
             n_epoch=args.epoch, start_from_epoch=start, start_step=step, ckpt_save_path=args.save_ckpt,
-            comet_api_key=args.comet_key, comet_project_name=args.comet_proj, log_comet=args.comet_key is not None)
+            comet_api_key=args.comet_key, comet_project_name=args.comet_proj, log_comet=args.comet_key is not None, freeze_autoencoder=args.freeze_autoencoder)
 
     else:
         model.eval()
