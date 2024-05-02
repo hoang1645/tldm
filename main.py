@@ -110,16 +110,18 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
                 with autocast():
                     x0 = model.autoencoder.decode(x0).sample
                     r_loss = reconstruction_loss_fn(x0, img)
-                a_grad_scaler.scale(r_loss).backward()
-                a_lr_scheduler.step()
-                a_grad_scaler.step(autoencoder_optimizer)
-                a_grad_scaler.update()
+                if not freeze_autoencoder:
+                    a_grad_scaler.scale(r_loss).backward()
+                    a_lr_scheduler.step()
+                    a_grad_scaler.step(autoencoder_optimizer)
+                    a_grad_scaler.update()
             else:
                 x0 = model.autoencoder.decode(x0).sample
                 r_loss = reconstruction_loss_fn(x0, img)
-                r_loss.backward()
-                a_lr_scheduler.step()
-                autoencoder_optimizer.step()
+                if not freeze_autoencoder:
+                    r_loss.backward()
+                    a_lr_scheduler.step()
+                    autoencoder_optimizer.step()
             
             # log shit
             if (training_step + 1) % 50 == 0:
