@@ -205,11 +205,11 @@ if __name__ == '__main__':
     print(args)
 
 
-    unet = UNet(in_chan=4, out_chan=4, embed_dim=1024, n_attn_heads=10, dim_head=64, conv_init_chan=160, chan_mults=(1,2,4,4),
-                where_attn=(False, True, True, True), norm_groups=16)
+    unet = UNet(in_chan=4, out_chan=4, embed_dim=1024, n_attn_heads=8, dim_head=64, conv_init_chan=128, chan_mults=(1,2,4,4),
+                where_attn=(False, True, True, True))
 
-    autoencoder = AutoencoderKL.from_config("stabilityai/sd-vae-ft-mse")
-    autoencoder.load_state_dict(torch.load("checkpoints/sd-ae-1epoch.pth")['state_dict'])
+    autoencoder = AutoencoderKL.from_config("stabilityai/sdxl-vae")
+    if args.from_ckpt is None: autoencoder.load_state_dict(torch.load("checkpoints/sd-ae-1epoch.pth")['state_dict'])
     
     model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.unet.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
