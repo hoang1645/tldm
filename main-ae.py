@@ -94,8 +94,10 @@ def train(model: AutoencoderKL,
             optimizer.zero_grad()
 
             
-            x0 = model(img).sample
-            r_loss = reconstruction_loss_fn(x0, img)
+            ld = model.encode(img).latent_dist
+            x0 = ld.mode()
+
+            r_loss = reconstruction_loss_fn(x0, img) + ld.kl() * 1e-6
             accelerator.backward(r_loss)
             optimizer.step()
             lr_scheduler.step()
@@ -218,8 +220,7 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    model = AutoencoderKL.from_single_file("https://huggingface.co/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors")
-    autoencoder.load_state_dict(torch.load("checkpoints/sd-ae-1epoch.pth")['state_dict'])
+    model = AutoencoderKL.from_pretrained("stabilityai/sdxl-vae")
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),
