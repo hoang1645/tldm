@@ -94,8 +94,10 @@ def train(model: AutoencoderKL,
             optimizer.zero_grad()
 
             
-            ld = model.encode(img).latent_dist
+            ld = model.module.encode(img).latent_dist
             x0 = ld.mode()
+
+            x0 = model.module.decode(x0).sample
 
             r_loss = reconstruction_loss_fn(x0, img) + ld.kl() * 1e-6
             accelerator.backward(r_loss)
