@@ -85,7 +85,7 @@ class LDM(nn.Module):
             x = one_by_sqrt_alpha_t * (x - (beta_t / sqrt_one_minus_alpha_cumulative_t) * predicted_noise) \
                 + torch.sqrt(beta_t) * z
             pbar.update(task, advance=1)
-        x = self.autoencoder.decode(x)
+        x = self.autoencoder.decode(x).sample
         if self.inverse_scale_transform:
             x = self.inverse_transform(x).type(torch.uint8).to('cpu')
         else:
