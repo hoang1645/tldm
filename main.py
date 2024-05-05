@@ -91,12 +91,14 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
             if freeze_autoencoder:
                 with torch.no_grad():
                     with autocast():
-                        x0 = model.autoencoder.encode(img).latent_dist.mode()
+                        ld = model.autoencoder.encode(img).latent_dist
+                        x0 = ld.mode()
                         x1, noise = model.forward_diffusion(x0.detach(), timesteps_tensor)
             
             else:
                 with autocast():
-                    x0 = model.autoencoder.encode(img).latent_dist.mode()
+                    ld = model.autoencoder.encode(img).latent_dist
+                    x0 = ld.mode()
                     x1, noise = model.forward_diffusion(x0.detach(), timesteps_tensor)
 
 
@@ -119,24 +121,24 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
                     if with_autocast:
                         with autocast(dtype=torch.bfloat16):
                             x0 = model.autoencoder.decode(x0).sample
-                            r_loss = reconstruction_loss_fn(x0, img)
+                            r_loss = reconstruction_loss_fn(x0, img) + 1e-6 * ld.kl().mean()
                     else:
                         x0 = model.autoencoder.decode(x0).sample
-                        r_loss = reconstruction_loss_fn(x0, img)
+                        r_loss = reconstruction_loss_fn(x0, img) + 1e-6 * ld.kl().mean()
             else:
                 autoencoder_optimizer.zero_grad()
 
                 if with_autocast:
                     with autocast():
                         x0 = model.autoencoder.decode(x0).sample
-                        r_loss = reconstruction_loss_fn(x0, img)
+                        r_loss = reconstruction_loss_fn(x0, img) + 1e-6 * ld.kl().mean()
                         a_grad_scaler.scale(r_loss).backward()
                         a_lr_scheduler.step()
                         a_grad_scaler.step(autoencoder_optimizer)
                         a_grad_scaler.update()
                 else:
                     x0 = model.autoencoder.decode(x0).sample
-                    r_loss = reconstruction_loss_fn(x0, img)
+                    r_loss = reconstruction_loss_fn(x0, img) + 1e-6 * ld.kl().mean()
                     r_loss.backward()
                     a_lr_scheduler.step()
                     autoencoder_optimizer.step()
