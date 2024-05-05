@@ -90,12 +90,14 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
             diffusion_optimizer.zero_grad()
             if freeze_autoencoder:
                 with torch.no_grad():
-                    x0 = model.autoencoder.encode(img).latent_dist.mode()
-                    x1, noise = model.forward_diffusion(x0.detach(), timesteps_tensor)
+                    with autocast():
+                        x0 = model.autoencoder.encode(img).latent_dist.mode()
+                        x1, noise = model.forward_diffusion(x0.detach(), timesteps_tensor)
             
             else:
-                x0 = model.autoencoder.encode(img).latent_dist.mode()
-                x1, noise = model.forward_diffusion(x0.detach(), timesteps_tensor)
+                with autocast():
+                    x0 = model.autoencoder.encode(img).latent_dist.mode()
+                    x1, noise = model.forward_diffusion(x0.detach(), timesteps_tensor)
 
 
             if with_autocast:
@@ -209,13 +211,13 @@ if __name__ == '__main__':
                 where_attn=(False, True, True, True))
 
     autoencoder = AutoencoderKL.from_config("stabilityai/sdxl-vae")
-    if args.from_ckpt is None: autoencoder.load_state_dict(torch.load("checkpoints/sd-ae-1epoch.pth")['state_dict'])
+    if args.from_ckpt is None: autoencoder.load_state_dict(torch.load("checkpoints/AE-epoch=8_rloss=0.009375.pth")['state_dict'])
     
     model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.unet.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     a_optim = torch.optim.AdamW(model.autoencoder.parameters(), lr=5e-6, betas=(args.beta1, args.beta2))
     if args.compile:
-        model = torch.compile(model, backend='inductor', mode='reduce-overhead')
+        model = torch.compile(model, backend='inductor', mode='max-autotune')
     print("Model initialized")
 
     summary(model, verbose=1)
