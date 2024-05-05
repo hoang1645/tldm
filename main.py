@@ -161,7 +161,7 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
         state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": model.state_dict(),
                       "diffusion_optim": diffusion_optimizer.state_dict(),
                       "autoencoder_optim": autoencoder_optimizer.state_dict()}
-        if hasattr(model, "_orig_mod"): state_dict["state_dict"] = model._orig_mod.state_dict(),
+        if hasattr(model, "_orig_mod"): state_dict["state_dict"] = model._orig_mod.state_dict()
         console.print("Saving checkpoint...")
         torch.save(state_dict, os.path.join(ckpt_save_path,
                                             "checkpoints/epoch={epoch}_loss={d_loss:.4}_rloss={r_loss:.4}.pth".format(
