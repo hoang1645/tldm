@@ -96,7 +96,7 @@ def train(model: AutoencoderKL,
             
             try: ld = model.encode(img).latent_dist
             except: ld = model.module.encode(img).latent_dist
-            x0 = ld.mode()
+            x0 = ld.sample()
 
             try: x0 = model.decode(x0).sample
             except: x0 = model.module.decode(x0).sample
