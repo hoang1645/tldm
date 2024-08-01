@@ -224,7 +224,7 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    model = AutoencoderKL.from_pretrained("stabilityai/sdxl-vae")
+    model = AutoencoderKL.from_pretrained("stabilityai/stable-diffusion-3-medium-diffusers", subfolder='vae', force_upcast=False)
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),
