@@ -70,21 +70,23 @@ class DecoderResBlock(nn.Module):
         if attention:
             self.attn = FlashSelfAttention()
             self.flatten = nn.Flatten(start_dim=2)
-            self.qkv = nn.Linear(channels_out, channels_out * 3)
+            self.qkv = nn.Conv2d(channels_out, channels_out * 3, kernel_size=1)
     
     
+    @torch.cuda.amp.autocast(dtype=torch.bfloat16)
     def _attn(self, x:torch.Tensor)->torch.Tensor:
         assert self.attn is not None
         old_shape = x.shape
-        x = self.flatten(x).transpose(-1, -2)
         x = self.qkv(x)
+        x = self.flatten(x).transpose(-1, -2)
+        
         q, k, v = torch.chunk(x, 3, dim=-1) # 3x (B, (H * W), C)
         q = rearrange(q, "B C (H D) -> B C H D", H = self.num_heads)
         k = rearrange(k, "B C (H D) -> B C H D", H = self.num_heads)
         v = rearrange(v, "B C (H D) -> B C H D", H = self.num_heads)
-        with torch.cuda.amp.autocast(False):
-            x = torch.stack([q, k, v], dim=2).bfloat16()
-            x = self.attn(x).float()
+        
+        x = torch.stack([q, k, v], dim=2)
+        x = self.attn(x)
         x = x.transpose(-1, -2)
         x = torch.reshape(x, old_shape)
         return x
@@ -114,6 +116,7 @@ class MiddleBlock(nn.Module):
         self.res2 = ResBlock(channels, channels)
         self.num_heads = num_heads
     
+    @torch.cuda.amp.autocast(dtype=torch.bfloat16)
     def _attn(self, x:torch.Tensor)->torch.Tensor:
         old_shape = x.shape
         x = self.flatten(x).transpose(-1, -2)
@@ -122,9 +125,9 @@ class MiddleBlock(nn.Module):
         q = rearrange(q, "B C (H D) -> B C H D", H = self.num_heads)
         k = rearrange(k, "B C (H D) -> B C H D", H = self.num_heads)
         v = rearrange(v, "B C (H D) -> B C H D", H = self.num_heads)
-        with torch.cuda.amp.autocast(False):
-            x = torch.stack([q, k, v], dim=2).bfloat16()
-            x = self.attn(x).float()
+        
+        x = torch.stack([q, k, v], dim=2)
+        x = self.attn(x)
         x = x.transpose(-1, -2)
         x = torch.reshape(x, old_shape)
         return x

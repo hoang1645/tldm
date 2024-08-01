@@ -10,7 +10,7 @@ from typing import List, Tuple, Dict
 class VAE(nn.Module):
     def __init__(self, in_channels:int=3, latent_channels:int=4,
                  conv_channels:List[int]=[128, 256, 512, 512], encoder_block_num_res_blocks:int=2, decoder_block_num_res_blocks:int=3, groups:int=32):
-        """a faithful recreation of VQ-VAE
+        """a faithful recreation of VAE
         params:
 
         - `in_channels`: number of channels of the input (usually 3 (for RGB images))
@@ -30,7 +30,7 @@ class VAE(nn.Module):
         for i, (cin, cout) in enumerate(zip(conv_channels[:-1], conv_channels[1:])):
             enc_res_blocks.append(EncoderResBlock(cin, cout, encoder_block_num_res_blocks, groups=groups, downsample=(i < len(conv_channels) - 1)))
         for i, (cin, cout) in enumerate(zip(conv_channels_rev[:-1], conv_channels_rev[1:])):
-            dec_res_blocks.append(DecoderResBlock(cin, cout, decoder_block_num_res_blocks, groups=groups, upsample=(i < len(conv_channels) - 1), attention=(i == 0)))
+            dec_res_blocks.append(DecoderResBlock(cin, cout, decoder_block_num_res_blocks, groups=groups, upsample=(i < len(conv_channels) - 1), attention=(i==0)))
         self.encoder = nn.Sequential(*enc_res_blocks, MiddleBlock(conv_channels[-1]))
         self.mu_logvar = nn.Linear(conv_channels[-1], latent_channels * 2)
         

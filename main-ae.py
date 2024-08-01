@@ -95,12 +95,12 @@ def train(model: VAE,
 
             x0, kl = model.forward(img)
             
-            r_loss = reconstruction_loss_fn(x0, img) + kl* 1e-6
+            r_loss = reconstruction_loss_fn(x0, img)
             accelerator.backward(r_loss)
             optimizer.step()
             lr_scheduler.step()
             
-
+            # print(x0)
             
             # log shit
             if (training_step + 1) % 50 == 0:
