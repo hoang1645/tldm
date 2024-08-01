@@ -107,7 +107,8 @@ def train(model: VAE,
                 tensorboard_logger.add_scalar('r_loss', r_loss, training_step)
                 if log_comet:
                     comet_logger.log_metric('r_loss', r_loss, training_step)
-
+            if (training_step + 1) % 1000 == 0:
+                tensorboard_logger.add_image(make_grid(x0))
 
             rlosses.append(r_loss.item())
             pbar.update(task, advance=1, loss=(kl * 1e-6).item(), rloss=r_loss.item())
@@ -218,7 +219,7 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    model = VAE(conv_channels=[64, 128, 256, 256])
+    model = VAE(conv_channels=[96, 192, 384, 384])
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),
