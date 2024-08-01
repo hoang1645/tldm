@@ -8,9 +8,9 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from comet_ml import Experiment
 # self-defined utilities
-from models.unet import UNet
-from models.diffuser import LDM
-from diffusers import AutoencoderKL
+# from models.unet import UNet
+# from models.diffuser import LDM
+from models.autoencoder import VAE
 # progress bar
 from rich.console import Console
 from rich.progress import Progress, BarColumn, TextColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn, \
@@ -33,7 +33,7 @@ from typing import Callable
 from accelerate import Accelerator
 
 
-def train(model: AutoencoderKL,
+def train(model: VAE,
           reconstruction_loss_fn: nn.Module | Callable[..., torch.Tensor],
           optimizer: torch.optim.Optimizer, lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
           train_dataloader: DataLoader,
@@ -93,15 +93,9 @@ def train(model: AutoencoderKL,
             #     klloss = model.reg_loss(x0)
             optimizer.zero_grad()
 
+            x0, kl = model.forward(img)
             
-            try: ld = model.encode(img).latent_dist
-            except: ld = model.module.encode(img).latent_dist
-            x0 = ld.sample()
-
-            try: x0 = model.decode(x0).sample
-            except: x0 = model.module.decode(x0).sample
-
-            r_loss = reconstruction_loss_fn(x0, img) + ld.kl().mean() * 1e-6
+            r_loss = reconstruction_loss_fn(x0, img) + kl* 1e-6
             accelerator.backward(r_loss)
             optimizer.step()
             lr_scheduler.step()
@@ -131,7 +125,7 @@ def train(model: AutoencoderKL,
         console.print(f"Checkpoint saved at [i]{os.path.join(ckpt_save_path, 'checkpoints/AE-epoch={epoch}_rloss={r_loss:.4}.pth'.format(epoch=epoch, r_loss=r_loss.item()))}[/i]")
         pbar.stop()
 
-def evaluate(model: AutoencoderKL,
+def evaluate(model: VAE,
           reconstruction_loss_fn: nn.Module | Callable[..., torch.Tensor],
           optimizer: torch.optim.Optimizer, lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
           train_dataloader: DataLoader,
@@ -224,7 +218,7 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    model = AutoencoderKL.from_pretrained("stabilityai/stable-diffusion-3-medium-diffusers", subfolder='vae', force_upcast=False)
+    model = VAE()
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),
@@ -235,12 +229,12 @@ if __name__ == '__main__':
     
     print("Model initialized")
 
-    summary(model, verbose=1)
+    summary(model, verbose=1, depth=6)
     if args.debug:
         model.cuda()
         x = torch.randn(1, 3, args.image_size, args.image_size).to(model.device)
         t = torch.randint(1, 1000, size=(1,)).to(model.device)
-        print(model.encode(x)[0].shape, model(x)[0].shape) 
+        print(model.encode(x)['mean'].shape, model(x)[0].shape) 
         exit(0)
     start = 0
     step = 0
