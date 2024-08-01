@@ -110,7 +110,7 @@ def train(model: VAE,
 
 
             rlosses.append(r_loss.item())
-            pbar.update(task, advance=1, loss=0., rloss=r_loss.item())
+            pbar.update(task, advance=1, loss=(kl * 1e-6).item(), rloss=r_loss.item())
             training_step += 1
 
         # summarize and save checkpoint
@@ -218,7 +218,7 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    model = VAE()
+    model = VAE(conv_channels=[64, 128, 256, 256])
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),
@@ -263,7 +263,7 @@ if __name__ == '__main__':
     reconstruction_loss = nn.MSELoss()
     train_dataloader = DataLoader(
         PixivDataset(args.dataset_path, imageSize=256,
-                    return_original=False, transforms=T.Lambda(lambda t: (t * 2) - 1)),
+                    return_original=False, resize_rate=.3),
         batch_size=args.batch_size, shuffle=True
     )
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(d_optim, 4000, args.lr / 10)

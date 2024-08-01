@@ -36,8 +36,8 @@ class ResizeAndPad(T.Transform):
         return TF.pad(TF.to_dtype(TF.to_image(new_im), dtype=torch.float32, scale=True), padding=[
             (SIZE - new_size[0]) >> 1,  #left
             (SIZE - new_size[1]) >> 1,  #top
-            (SIZE - new_size[0]) - (SIZE - new_size[0]) >> 1,  #right
-            (SIZE - new_size[1]) - (SIZE - new_size[1]) >> 1,  #bottom            
+            (SIZE - new_size[0]) - ((SIZE - new_size[0]) >> 1),  #right
+            (SIZE - new_size[1]) - ((SIZE - new_size[1]) >> 1),  #bottom            
         ], padding_mode='edge')
 
 
