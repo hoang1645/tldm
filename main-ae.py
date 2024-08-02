@@ -108,7 +108,7 @@ def train(model: VAE,
                 if log_comet:
                     comet_logger.log_metric('r_loss', r_loss, training_step)
             if (training_step + 1) % 1000 == 0:
-                tensorboard_logger.add_image(make_grid(x0))
+                tensorboard_logger.add_image('generated', make_grid(x0), training_step)
 
             rlosses.append(r_loss.item())
             pbar.update(task, advance=1, loss=(kl * 1e-6).item(), rloss=r_loss.item())
@@ -219,11 +219,10 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    model = VAE(conv_channels=[96, 192, 384, 384])
+    model = VAE(conv_channels=[64, 128, 256, 256])
 
     # model = LDM(unet, autoencoder, 256)
-    d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),
-                                weight_decay=0 if not args.fp16 else 0.01)
+    d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.05)
     
     if args.compile:
         model = torch.compile(model, backend='inductor', mode='reduce-overhead')
@@ -264,7 +263,7 @@ if __name__ == '__main__':
     reconstruction_loss = nn.MSELoss()
     train_dataloader = DataLoader(
         PixivDataset(args.dataset_path, imageSize=256,
-                    return_original=False, resize_rate=.3),
+                    return_original=False, resize_rate=.3, transforms=T.Lambda(lambda x : 2 * x - 1)),
         batch_size=args.batch_size, shuffle=True
     )
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(d_optim, 4000, args.lr / 10)
