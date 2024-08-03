@@ -31,17 +31,24 @@ class ResizeAndPad(T.Transform):
         new_size = tuple([int(x*ratio) for x in im.size])
 
         new_im = im.resize(new_size, Image.LANCZOS)
-        # , ((SIZE-new_size[0])//2,
-        #                     (SIZE-new_size[1])//2))
 
-        return TF.pad(TF.to_dtype(TF.to_image(new_im), dtype=torch.float32, scale=True),
-                      padding=[
-                          (SIZE - new_size[0]) // 2,
-                          (SIZE - new_size[1]) // 2,
-                          (SIZE - new_size[0])- (SIZE - new_size[0]) // 2,
-                          (SIZE - new_size[1]) - (SIZE - new_size[1]) // 2,
-                          
-                      ], padding_mode='reflect')
+        padding = [(SIZE - new_size[0]) // 2,
+                    (SIZE - new_size[1]) // 2,
+                    (SIZE - new_size[0]) - (SIZE - new_size[0]) // 2,
+                    (SIZE - new_size[1]) - (SIZE - new_size[1]) // 2,
+                ]
+        
+        scaled = TF.to_dtype(TF.to_image(new_im), dtype=torch.float32, scale=True)
+        for i in range(4):
+            while padding[i] >= new_size[i%2]:
+                pad = [0, 0, 0, 0]
+                pad[i] = new_size[i%2] - 1
+                scaled = TF.pad(scaled, padding=pad, padding_mode='reflect')
+                padding[i] -= new_size[i%2] - 1
+
+
+        return TF.pad(scaled,
+                      padding=padding, padding_mode='reflect')
 
 
 
