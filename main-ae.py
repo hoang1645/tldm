@@ -219,7 +219,7 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    model = VAE(conv_channels=[64, 128, 256, 256])
+    model = VAE(conv_channels=[96, 192, 384, 384])
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.05)
