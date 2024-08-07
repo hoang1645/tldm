@@ -117,8 +117,9 @@ def train(model: VAE,
         # summarize and save checkpoint
         console.print(f"Epoch {epoch}, reconstruction loss = {sum(rlosses) / len(rlosses)}.")
         state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": model.state_dict(),
-                      
-                      "autoencoder_optim": optimizer.state_dict()}
+                      "autoencoder_optim": optimizer.state_dict(),
+                      "lr_sched": lr_scheduler.state_dict()}
+        if hasattr(model, "_orig_mod"): state_dict['state_dict'] = model._orig_mod.state_dict()
         console.print("Saving checkpoint...")
         torch.save(state_dict, os.path.join(ckpt_save_path,
                                             "checkpoints/AE-epoch={epoch}_rloss={r_loss:.4}.pth".format(
@@ -223,7 +224,8 @@ if __name__ == '__main__':
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.05)
-    
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(d_optim, 4000, args.lr / 10)
+
     if args.compile:
         model = torch.compile(model, backend='inductor', mode='reduce-overhead')
     
@@ -232,6 +234,7 @@ if __name__ == '__main__':
     summary(model, verbose=1, depth=6)
     if args.debug:
         model.cuda()
+        print(model)
         x = torch.randn(1, 3, args.image_size, args.image_size).to(model.device)
         t = torch.randint(1, 1000, size=(1,)).to(model.device)
         print(model.encode(x)['mean'].shape, model(x)[0].shape) 
@@ -241,11 +244,12 @@ if __name__ == '__main__':
     
     if args.from_ckpt is not None:
         dicts = torch.load(args.from_ckpt, map_location="cuda:0")
-        model.load_state_dict(dicts['state_dict'], strict=False)
+        model.load_state_dict(dicts['state_dict'], strict=True)
         start = dicts['epoch']
         step = dicts['step']
         if not args.reset_optimizers:
             d_optim.load_state_dict(dicts['autoencoder_optim'])
+            lr_scheduler.load_state_dict(dicts['lr_sched'])
 
         print("Loaded from checkpoint", args.from_ckpt)
 
@@ -266,7 +270,7 @@ if __name__ == '__main__':
                     return_original=False, resize_rate=.3, transforms=T.Lambda(lambda x : 2 * x - 1)),
         batch_size=args.batch_size, shuffle=True
     )
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(d_optim, 4000, args.lr / 10)
+    
     accelerator = Accelerator(gradient_accumulation_steps=args.accumulate_gradients)
     model, d_optim, train_dataloader, lr_scheduler = accelerator.prepare(model, d_optim, train_dataloader, lr_scheduler)
 
