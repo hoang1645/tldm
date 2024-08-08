@@ -58,10 +58,8 @@ class VAE(nn.Module):
     
     
     def kld(self, mean:torch.Tensor, logvar:torch.Tensor):
-        z = self.reparameterize(mean, logvar)
-        log_softmax = torch.nn.functional.log_softmax(z)
-        target = torch.nn.functional.softmax(torch.randn_like(z))
-        return torch.nn.functional.kl_div(log_softmax, target, reduction='batchmean')
+        logvar = torch.clamp(logvar, -30.0, 20.0)
+        return -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
 
     def decode(self, z:torch.Tensor) -> torch.Tensor:
         return self.out(self.decoder(z))

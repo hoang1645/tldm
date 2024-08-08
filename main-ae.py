@@ -95,7 +95,7 @@ def train(model: VAE,
 
             x0, kl = model.forward(img)
             
-            r_loss = reconstruction_loss_fn(x0, img)
+            r_loss = reconstruction_loss_fn(x0, img) + 1e-6 * kl
             accelerator.backward(r_loss)
             optimizer.step()
             lr_scheduler.step()
