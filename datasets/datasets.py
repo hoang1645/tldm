@@ -60,13 +60,11 @@ class PixivDataset(Dataset):
         if transforms is not None:
             self.transform = T.Compose(
                 [T.RandomChoice([ResizeAndPad(imageSize), 
-                                 T.Compose([T.RandomCrop(imageSize, pad_if_needed=True, padding_mode='edge'), T.ToImage(), T.ToDtype(torch.float32, scale=True)]),
-                                 T.Compose([T.Resize(imageSize), T.CenterCrop(imageSize), T.ToImage(), T.ToDtype(torch.float32, scale=True)])], p=[resize_rate, (1-resize_rate)/2, (1-resize_rate)/2]), transforms])
+                                 T.Compose([T.Resize(imageSize), T.CenterCrop(imageSize), T.ToImage(), T.ToDtype(torch.float32, scale=True)])], p=[resize_rate, 1 - resize_rate]), transforms])
         else:
             self.transform = T.RandomChoice([ResizeAndPad(imageSize), 
-                                 T.Compose([T.RandomCrop(imageSize, pad_if_needed=True, padding_mode='edge'), T.ToImage(), T.ToDtype(torch.float32, scale=True)]),
                                  T.Compose([T.Resize(imageSize), T.CenterCrop(imageSize), T.ToImage(), T.ToDtype(torch.float32, scale=True)])],
-                                 p=[resize_rate, (1-resize_rate)/2, (1-resize_rate)/2])
+                                 p=[resize_rate, (1-resize_rate)])
 
         self.imagePath = imagePath
         self.imageSize = imageSize

@@ -220,11 +220,11 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    model = VAE(conv_channels=[96, 192, 384, 384])
+    model = VAE(conv_channels=[96, 192, 384, 384], groups=16)
 
     # model = LDM(unet, autoencoder, 256)
-    d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.05)
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(d_optim, 4000, args.lr / 10)
+    d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.001)
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(d_optim, 20000, args.lr / 5)
 
     if args.compile:
         model = torch.compile(model, backend='inductor', mode='reduce-overhead')
@@ -234,10 +234,10 @@ if __name__ == '__main__':
     summary(model, verbose=1, depth=6)
     if args.debug:
         model.cuda()
-        print(model)
         x = torch.randn(1, 3, args.image_size, args.image_size).to(model.device)
         t = torch.randint(1, 1000, size=(1,)).to(model.device)
-        print(model.encode(x)['mean'].shape, model(x)[0].shape) 
+        with autocast():
+            print(model.encode(x)['mean'].shape, model(x)[0].shape) 
         exit(0)
     start = 0
     step = 0
@@ -268,7 +268,7 @@ if __name__ == '__main__':
     train_dataloader = DataLoader(
         PixivDataset(args.dataset_path, imageSize=256,
                     return_original=False, resize_rate=.3, transforms=T.Lambda(lambda x : 2 * x - 1)),
-        batch_size=args.batch_size, shuffle=True
+        batch_size=args.batch_size, shuffle=True, num_workers=4, drop_last=True
     )
     
     accelerator = Accelerator(gradient_accumulation_steps=args.accumulate_gradients)
