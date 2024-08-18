@@ -80,6 +80,9 @@ def train(model: LDM, timesteps: int, diffusion_loss_fn: nn.Module | Callable[..
 
         task = pbar.add_task("", total=len(train_dataloader), loss=0.0, rloss=.0)
         pbar.start()
+        min_kl_pen = 1e-9
+        max_kl_pen = 1e-6
+        kl_pen = 0 if epoch < 20 else min_kl_pen + (max_kl_pen - min_kl_pen) / 50 * min(epoch - 20, 50)
         # train
         for img in train_dataloader:
             # size of batch in dataloader
