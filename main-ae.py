@@ -31,9 +31,11 @@ import os
 # typing
 from typing import Callable
 from accelerate import Accelerator
+from peft import LoraConfig, get_peft_model, get_peft_model_state_dict, load_peft_weights, set_peft_model_state_dict, PeftModel
+from diffusers.training_utils import cast_training_params
 
 
-def train(model: AutoencoderKL,
+def train(model: PeftModel|AutoencoderKL,
           reconstruction_loss_fn: nn.Module | Callable[..., torch.Tensor],
           optimizer: torch.optim.Optimizer, lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
           train_dataloader: DataLoader,
@@ -115,20 +117,23 @@ def train(model: AutoencoderKL,
                     comet_logger.log_metric('r_loss', r_loss, training_step)
 
 
+            if (training_step + 1) % 1000 == 0:
+                tensorboard_logger.add_image('generated', make_grid((x0 + 1) / 2), training_step)
+
             rlosses.append(r_loss.item())
             pbar.update(task, advance=1, loss=0., rloss=r_loss.item())
             training_step += 1
 
         # summarize and save checkpoint
         console.print(f"Epoch {epoch}, reconstruction loss = {sum(rlosses) / len(rlosses)}.")
-        state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": model.state_dict(),
+        state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": get_peft_model_state_dict(model, unwrap_compiled=True),
                       
                       "autoencoder_optim": optimizer.state_dict()}
         console.print("Saving checkpoint...")
         torch.save(state_dict, os.path.join(ckpt_save_path,
-                                            "checkpoints/AE-epoch={epoch}_rloss={r_loss:.4}.pth".format(
+                                            "checkpoints/AE-LoRA-epoch={epoch}_rloss={r_loss:.4}.pth".format(
             epoch=epoch,  r_loss=r_loss.item())))
-        console.print(f"Checkpoint saved at [i]{os.path.join(ckpt_save_path, 'checkpoints/AE-epoch={epoch}_rloss={r_loss:.4}.pth'.format(epoch=epoch, r_loss=r_loss.item()))}[/i]")
+        console.print(f"Checkpoint saved at [i]{os.path.join(ckpt_save_path, 'checkpoints/AE-LoRA-epoch={epoch}_rloss={r_loss:.4}.pth'.format(epoch=epoch, r_loss=r_loss.item()))}[/i]")
         pbar.stop()
 
 def evaluate(model: AutoencoderKL,
@@ -173,8 +178,9 @@ def evaluate(model: AutoencoderKL,
             # else:
             #     x0 = model.encode(img)
             #     klloss = model.reg_loss(x0)
-            x0 = model(img).sample
-            r_loss = reconstruction_loss_fn(x0, img)
+            ld = model.encode(img).latent_dist
+            x0 = ld.sample()
+            r_loss = reconstruction_loss_fn(x0, img) + ld.kl().mean()
             
             rlosses.append(r_loss.item())
             pbar.update(task, advance=1, loss=0., rloss=r_loss.item())
@@ -224,7 +230,11 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    model = AutoencoderKL.from_pretrained("stabilityai/stable-diffusion-3-medium-diffusers", subfolder='vae', force_upcast=False)
+    model: AutoencoderKL = AutoencoderKL.from_pretrained("stabilityai/stable-diffusion-3-medium-diffusers", subfolder='vae', force_upcast=False)
+    model.requires_grad_(False)
+    lora_config = LoraConfig(r=16, lora_alpha=64, init_lora_weights="gaussian", target_modules=['to_k', 'to_q', 'to_v', 'to_out.0'])
+    model = get_peft_model(model, lora_config)
+    cast_training_params(model)
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),
@@ -236,18 +246,22 @@ if __name__ == '__main__':
     print("Model initialized")
 
     summary(model, verbose=1)
+
     if args.debug:
         model.cuda()
         x = torch.randn(1, 3, args.image_size, args.image_size).to(model.device)
         t = torch.randint(1, 1000, size=(1,)).to(model.device)
-        print(model.encode(x)[0].shape, model(x)[0].shape) 
+        with autocast(): print(model.encode(x)[0].sample().shape, model(x)[0].shape) 
+        model.save_pretrained("checkpoints")
+
         exit(0)
     start = 0
     step = 0
     
     if args.from_ckpt is not None:
         dicts = torch.load(args.from_ckpt, map_location="cuda:0")
-        model.load_state_dict(dicts['state_dict'], strict=False)
+        # model.load_state_dict(dicts['state_dict'], strict=False)
+        set_peft_model_state_dict(model, dicts['state_dict'])
         start = dicts['epoch']
         step = dicts['step']
         if not args.reset_optimizers:
