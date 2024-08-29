@@ -37,7 +37,7 @@ class FusedModel(nn.Module):
         self.qconv = nn.Conv2d(16, 64, 3, 1, 1)
         self.post_qconv = nn.Conv2d(64, 16, 3, 1, 1)
         self.vq = VectorQuantize(
-            dim=16,
+            dim=64,
             codebook_size=4096,
             accept_image_fmap=True,
             orthogonal_reg_weight=10,
