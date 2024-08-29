@@ -7,10 +7,9 @@ from torch.utils.data import DataLoader
 # loggers
 from torch.utils.tensorboard import SummaryWriter
 from comet_ml import Experiment
-# self-defined utilities
-from models.unet import UNet
-from models.diffuser import LDM
+#modeling
 from diffusers import AutoencoderKL
+from vector_quantize_pytorch import VectorQuantize
 # progress bar
 from rich.console import Console
 from rich.progress import Progress, BarColumn, TextColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn, \
@@ -24,18 +23,45 @@ from torch.cuda.amp import autocast
 from torch.cuda.amp.grad_scaler import GradScaler
 # other utilities
 from torchvision.utils import make_grid
-import matplotlib.pyplot as plt
 import torchvision.transforms.v2 as T
-from generation_evaluate.metrics import FID
 import os
 # typing
 from typing import Callable
 from accelerate import Accelerator
-from peft import LoraConfig, get_peft_model, get_peft_model_state_dict, load_peft_weights, set_peft_model_state_dict, PeftModel
-from diffusers.training_utils import cast_training_params
 
 
-def train(model: PeftModel|AutoencoderKL,
+class FusedModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.vae : AutoencoderKL = AutoencoderKL.from_pretrained("stabilityai/stable-diffusion-3-medium-diffusers", subfolder='vae', force_upcast=False)
+        self.qconv = nn.Conv2d(16, 64, 3, 1, 1)
+        self.post_qconv = nn.Conv2d(64, 16, 3, 1, 1)
+        self.vq = VectorQuantize(
+            dim=16,
+            codebook_size=4096,
+            accept_image_fmap=True,
+            orthogonal_reg_weight=10,
+            orthogonal_reg_max_codes=128,
+            orthogonal_reg_active_codes_only=False
+        )
+        self.vae.requires_grad_(False)
+        self.device = 'cuda'
+        
+    def encode(self, x:torch.Tensor):
+        ld = self.vae.encode(x).latent_dist
+        x = ld.sample() * self.vae.config.scaling_factor
+        x = self.qconv(x)
+        with torch.cuda.amp.autocast(enabled=False):
+            x, idx, vqloss = self.vq.forward(x)
+        x = self.post_qconv(x)
+        return x, idx, vqloss, ld.kl().mean()
+    
+    def forward(self, x:torch.Tensor):
+        x, idx, vqloss, kld = self.encode(x)
+        return self.vae.decode(x / self.vae.config.scaling_factor).sample, idx, vqloss, kld
+
+
+def train(model: FusedModel,
           reconstruction_loss_fn: nn.Module | Callable[..., torch.Tensor],
           optimizer: torch.optim.Optimizer, lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
           train_dataloader: DataLoader,
@@ -45,6 +71,8 @@ def train(model: PeftModel|AutoencoderKL,
     if ckpt_save_path is None:
         ckpt_save_path = '.'
     # Prepare model
+    summary(model)
+    model.dtype
     model = model.train()
     if fp16: model = model.half()
     # initialize loggers
@@ -95,15 +123,9 @@ def train(model: PeftModel|AutoencoderKL,
             #     klloss = model.reg_loss(x0)
             optimizer.zero_grad()
 
-            
-            try: ld = model.encode(img).latent_dist
-            except: ld = model.module.encode(img).latent_dist
-            x0 = ld.sample()
+            x0, _, vqloss, kld = model.forward(img)
 
-            try: x0 = model.decode(x0).sample
-            except: x0 = model.module.decode(x0).sample
-
-            r_loss = reconstruction_loss_fn(x0, img) + ld.kl().mean() * 1e-6
+            r_loss = reconstruction_loss_fn(x0, img) + vqloss * 0.25 + kld * 1e-6
             accelerator.backward(r_loss)
             optimizer.step()
             lr_scheduler.step()
@@ -126,7 +148,7 @@ def train(model: PeftModel|AutoencoderKL,
 
         # summarize and save checkpoint
         console.print(f"Epoch {epoch}, reconstruction loss = {sum(rlosses) / len(rlosses)}.")
-        state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": get_peft_model_state_dict(model, unwrap_compiled=True),
+        state_dict = {"epoch": epoch + 1, "step": training_step + 1, "state_dict": model.state_dict(),
                       
                       "autoencoder_optim": optimizer.state_dict()}
         console.print("Saving checkpoint...")
@@ -230,11 +252,7 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
 
-    model: AutoencoderKL = AutoencoderKL.from_pretrained("stabilityai/stable-diffusion-3-medium-diffusers", subfolder='vae', force_upcast=False)
-    model.requires_grad_(False)
-    lora_config = LoraConfig(r=16, lora_alpha=64, init_lora_weights="gaussian", target_modules=['to_k', 'to_q', 'to_v', 'to_out.0'])
-    model = get_peft_model(model, lora_config)
-    cast_training_params(model)
+    model = FusedModel()
 
     # model = LDM(unet, autoencoder, 256)
     d_optim = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2),
@@ -251,17 +269,15 @@ if __name__ == '__main__':
         model.cuda()
         x = torch.randn(1, 3, args.image_size, args.image_size).to(model.device)
         t = torch.randint(1, 1000, size=(1,)).to(model.device)
-        with autocast(): print(model.encode(x)[0].sample().shape, model(x)[0].shape) 
-        model.save_pretrained("checkpoints")
-
+        with autocast(): print(model.encode(x)[0].shape, model(x)[0].shape) 
+        
         exit(0)
     start = 0
     step = 0
     
     if args.from_ckpt is not None:
         dicts = torch.load(args.from_ckpt, map_location="cuda:0")
-        # model.load_state_dict(dicts['state_dict'], strict=False)
-        set_peft_model_state_dict(model, dicts['state_dict'])
+        model.load_state_dict(dicts['state_dict'], strict=False)
         start = dicts['epoch']
         step = dicts['step']
         if not args.reset_optimizers:
