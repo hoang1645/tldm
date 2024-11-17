@@ -21,6 +21,7 @@ class LDM(nn.Module):
                  text_model_kwargs:List[Dict], token_limit:int, freeze_text_encoders:bool=True,
                  **activation_kwargs):
         super().__init__()
+        print(activation_kwargs)
         self.autoencoder = vae
         self.diffusion = DiffusionTransformer(patch_size, channels, num_layers, model_dim, hidden_dim, n_heads, dropout, activation, **activation_kwargs)
         self.text_condition_embedding = TextConditionEmbedding(model_dim, text_model_kwargs, token_limit, freeze_text_encoders)
@@ -77,6 +78,7 @@ class LDM(nn.Module):
         if isinstance(image_size, int):
             image_size = (image_size, image_size)
         print("Trying to get sample latent shape")
+
         dummy = torch.zeros((num_images, 3, *image_size), device=self.device, dtype=dtype)
         if isinstance(self.autoencoder, AutoencoderKL):
             shape = self.autoencoder.encode(dummy).latent_dist.sample().shape

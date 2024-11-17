@@ -1,0 +1,24 @@
+model:
+  vae:
+    type: "diffusers.AutoencoderTiny"
+    model_name_or_path: "madebyollin/taef1"
+    subfolder: null
+  text_encoder:
+    - model_type: "transformers.T5EncoderModel"
+      model_name_or_path: "google/flan-t5-small"
+    - model_type: "transformers.CLIPTextModel"
+      model_name_or_path: "openai/clip-vit-base-patch32"
+  token_limit: 77
+  diffusion:
+    patch_size: 2
+    channels: 16
+    num_layers: 12
+    model_dim: 384
+    hidden_dim: 1536
+    n_heads: 6
+    dropout: 0.0
+    activation: 
+      type: "torch.nn.SiLU"
+      kwargs: null
+  
+

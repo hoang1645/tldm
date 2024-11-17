@@ -1,0 +1,12 @@
+torch==2.5.1
+torchvision==0.20.0
+accelerate==1.0.1
+transformers==4.46.0
+diffusers==0.31.0
+xformers==0.0.28.post3
+pillow==11.0.0
+pandas==2.2.3
+pyarrow==15.0.2
+rich==13.7.1
+webdataset==0.2.100
+torchinfo==1.8.0
