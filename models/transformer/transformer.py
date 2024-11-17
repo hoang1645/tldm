@@ -21,8 +21,8 @@ class MemoryEfficientAttention(nn.Module):
             attention=self.attention,
         )
 
-    def forward(self, x, attention_mask=None):
-        return self.multihead(x, attention_mask)
+    def forward(self, x, k=None, v=None, attention_mask=None):
+        return self.multihead(x, k, v, attention_mask)
 
 
 
@@ -55,19 +55,17 @@ class TransformerLayer(nn.Module):
         self.adaptive = AdaLN(model_dim)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x:torch.Tensor):
-        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaptive(x)
-        attn_out = self.attn(AdaLN.modulate(self.norm1(x), shift_msa, scale_msa))
+    def forward(self, x:torch.Tensor, conditioning:torch.Tensor):
+        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaptive(x, conditioning)
+        attn_out = self.attn(self.adaptive.modulate(self.norm1(x), shift_msa, scale_msa))
         x = x + self.dropout(attn_out) * gate_msa
 
-        ffn_out = self.ffn(AdaLN.modulate(self.norm2(x), shift_mlp, scale_mlp))
+        ffn_out = self.ffn(self.adaptive.modulate(self.norm2(x), shift_mlp, scale_mlp))
         x = x + self.dropout(ffn_out) * gate_mlp
         return x
 
 
-class TransformerHead(nn.Module):
-    def __init__(self, model_dim:int, hidden_dim, n_heads, dropout, activation, **activation_kwargs):
-        super().__init__()
+
 
 
 # # Example usage:
