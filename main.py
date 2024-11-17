@@ -4,9 +4,6 @@ import torch
 from torchinfo import summary
 import yaml
 
-
-from transformers import CLIPModel
-
 with open("configs/model.yaml") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)["model"]
 
@@ -16,7 +13,7 @@ def parse_module_and_class(module_class:str):
     return getattr(__import__(module, fromlist=[cls]), cls)
 
 #-------------------vae-------------------
-vae = parse_module_and_class(config["vae"]["type"]).from_pretrained(config["vae"]["model_name_or_path"])
+vae = parse_module_and_class(config["vae"]["type"]).from_pretrained(config["vae"]["model_name_or_path"], subfolder=config["vae"]["subfolder"])
 #-------------------text------------------
 text_model_kwargs = config["text_encoder"]
 for kwargs in text_model_kwargs:
