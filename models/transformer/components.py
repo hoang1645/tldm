@@ -71,7 +71,10 @@ class TextConditioner(nn.Module):
         # model_name_or_path must be a valid repo from HF Hub or a local path with the same structure.
         
         self.model = model_type.from_pretrained(model_name_or_path)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+        except ValueError:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False)
         self.token_limit = token_limit
 
     def forward(self, text:str|list[str]):

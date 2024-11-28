@@ -4,11 +4,11 @@ model:
     model_name_or_path: "madebyollin/taef1"
     subfolder: null
   text_encoder:
-    - model_type: "transformers.T5EncoderModel"
-      model_name_or_path: "google/flan-t5-small"
-    - model_type: "transformers.CLIPTextModel"
-      model_name_or_path: "openai/clip-vit-base-patch32"
-  token_limit: 77
+    - model_type: "transformers.MT5EncoderModel"
+      model_name_or_path: "google/mt5-small"
+    - model_type: "transformers.BertModel"
+      model_name_or_path: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  token_limit: 512
   diffusion:
     patch_size: 2
     channels: 16

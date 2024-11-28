@@ -18,6 +18,7 @@ vae = parse_module_and_class(config["vae"]["type"]).from_pretrained(config["vae"
 text_model_kwargs = config["text_encoder"]
 for kwargs in text_model_kwargs:
     kwargs["model_type"] = parse_module_and_class(kwargs["model_type"])
+    print(kwargs)
 token_limit = config["token_limit"]
 model_kwargs = config["diffusion"]
 activation_kwargs = model_kwargs["activation"]["kwargs"] or {}
