@@ -10,7 +10,11 @@ from diffusers import AutoencoderKL, AutoencoderTiny
 
 from models.dit import DiffusionTransformer
 from models.transformer.components import TextConditionEmbedding
+from models.schedulers.ddim import DDIMScheduler
+from models.schedulers.ddpm import DDPMScheduler
+from models.schedulers.euler import EulerDiscreteScheduler
 
+from typing import Literal
 
 
 class LDM(nn.Module):
@@ -19,6 +23,9 @@ class LDM(nn.Module):
                  model_dim:int, hidden_dim, n_heads, 
                  dropout, activation, 
                  text_model_kwargs:List[Dict], token_limit:int, freeze_text_encoders:bool=True,
+                 scheduler:Literal['euler', 'ddpm', 'ddim'] = 'ddpm',
+                 n_diffusion_steps:int = 1000,
+                 n_backward_steps:int = 1000,
                  **activation_kwargs):
         super().__init__()
         print(activation_kwargs)
@@ -30,30 +37,19 @@ class LDM(nn.Module):
         self.to(self.device)
         self.inverse_scale_transform = True
 
-        self.n_diffusion_steps = 1000
+        self.n_diffusion_steps = n_diffusion_steps
+        self.n_backward_steps = n_backward_steps
         # initialize
-        self.betas = self.__get_betas()
-        self.alphas = 1 - self.betas
-        self.sqrt_beta = torch.sqrt(self.betas)
-        self.alpha_cumulative = torch.cumprod(self.alphas, dim=0)
-        self.sqrt_alpha_cumulative = torch.sqrt(self.alpha_cumulative)
-        self.one_by_sqrt_alpha = 1. / torch.sqrt(self.alphas)
-        self.sqrt_one_minus_alpha_cumulative = torch.sqrt(1 - self.alpha_cumulative)
-
         
-
-    def __get_betas(self, scheduler: str = 'linear') -> torch.Tensor:
-        if scheduler == 'linear':
-            scale = 1000 / self.n_diffusion_steps
-            beta_start = scale * 1e-4
-            beta_end = scale * 0.02
-            return torch.linspace(
-                beta_start,
-                beta_end,
-                self.n_diffusion_steps,
-                device=self.device
-            )
-        raise NotImplementedError("Beta schedulers other than linear are not yet implemented")
+        if scheduler == 'euler':
+            self.scheduler = EulerDiscreteScheduler(self.n_diffusion_steps, self.n_backward_steps)
+        elif scheduler == 'ddpm':
+            self.scheduler = DDPMScheduler(self.n_diffusion_steps, self.n_backward_steps)
+        elif scheduler == 'ddim':
+            self.scheduler = DDIMScheduler(self.n_diffusion_steps, self.n_backward_steps)
+        else:
+            raise ValueError("Scheduler must be one of 'euler', 'ddpm', or 'ddim'")
+        
 
     def encode_text(self, text:str|list[str]):
         return self.text_condition_embedding(text)
@@ -61,6 +57,9 @@ class LDM(nn.Module):
     def forward(self, x:torch.Tensor, timesteps:torch.Tensor, c:torch.Tensor):
         return self.diffusion(x, timesteps, c)
     
+
+    def forward_diffusion(self, x:torch.Tensor, timesteps:torch.Tensor):
+        return self.scheduler.forward(x, timesteps)
 
     def forward_with_cfg(self, x, t, c, cfg_scale):
         return self.diffusion.forward_with_cfg(x, t, c, cfg_scale)
@@ -75,6 +74,8 @@ class LDM(nn.Module):
                                     num_images: int = 1, return_grid=True, n_image_per_row: int = 5, dtype=torch.float32,
                                     image_size:int|Tuple[int]=(256, 256)) -> \
             Image.Image | List[Image.Image]:
+        assert timesteps % self.scheduler.step_size == 0, "Timesteps must be divisible by step size"
+
         if isinstance(image_size, int):
             image_size = (image_size, image_size)
         print("Trying to get sample latent shape")
@@ -95,21 +96,16 @@ class LDM(nn.Module):
         pbar = Progress(TextColumn("Generating"), BarColumn(), MofNCompleteColumn(), TimeElapsedColumn(),
                         TimeRemainingColumn())
 
-        task = pbar.add_task("", total=timesteps - 1)
+        task = pbar.add_task("", total=timesteps // self.scheduler.step_size - 1)
         pbar.start()
         c = self.encode_text(condition_text)
-        for time_step in range(timesteps - 1, 0, -1):
+        time_step = timesteps - self.scheduler.step_size
+        while time_step > 0:
             ts = torch.full((num_images,), time_step, device=self.device, dtype=dtype)
-            z = torch.randn_like(x, dtype=dtype) if time_step > 1 else torch.zeros_like(x, dtype=dtype)
-
             predicted_noise = self(x, ts, c)
-            beta_t = self.betas[time_step]
-            one_by_sqrt_alpha_t = self.one_by_sqrt_alpha[time_step]
-            sqrt_one_minus_alpha_cumulative_t = self.sqrt_one_minus_alpha_cumulative[time_step]
-
-            x = one_by_sqrt_alpha_t * (x - (beta_t / sqrt_one_minus_alpha_cumulative_t) * predicted_noise) \
-                + torch.sqrt(beta_t) * z
+            x, time_step = self.scheduler.backward(x, ts, predicted_noise)
             pbar.update(task, advance=1)
+            
         x = self.autoencoder.decode(x).sample
         if self.inverse_scale_transform:
             x = self.inverse_transform(x).type(torch.uint8).to('cpu')
