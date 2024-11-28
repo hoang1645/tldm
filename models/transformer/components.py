@@ -80,8 +80,8 @@ class TextConditioner(nn.Module):
     def forward(self, text:str|list[str]):
         if isinstance(text, str):
             text = [text]
-        text = self.tokenizer(text, return_tensors="pt", padding="max_length", max_length=self.token_limit, truncation=True).input_ids.to(self.model.device)
-        return self.model(text).last_hidden_state
+        text = self.tokenizer(text, return_tensors="pt", padding="max_length", max_length=self.token_limit, truncation=True).to(self.model.device)
+        return self.model(text.input_ids, attention_mask=text.attention_mask).last_hidden_state
     
 
 
