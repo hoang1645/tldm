@@ -25,10 +25,10 @@ class DDIMScheduler(BaseScheduler):
             t - delta (int): next time step
         """
         assert torch.all(t >= self.step_size), "Time step must be no less than step size"
-        sqrt_alpha_t_minus_delta = self.sqrt_alpha_cumulative[t - self.step_size]
-        sqrt_one_minus_alpha_t = self.sqrt_one_minus_alpha_cumulative[t]
-        sqrt_alpha_t = self.sqrt_alpha_cumulative[t]
-        sqrt_one_minus_alpha_t_minus_delta = self.sqrt_one_minus_alpha_cumulative[t - self.step_size]
+        sqrt_alpha_t_minus_delta = self.sqrt_alpha_cumulative[t - self.step_size].to(x.device)
+        sqrt_one_minus_alpha_t = self.sqrt_one_minus_alpha_cumulative[t].to(x.device)
+        sqrt_alpha_t = self.sqrt_alpha_cumulative[t].to(x.device)
+        sqrt_one_minus_alpha_t_minus_delta = self.sqrt_one_minus_alpha_cumulative[t - self.step_size].to(x.device)
 
         x_t_minus_delta = sqrt_alpha_t_minus_delta * (x - eps * sqrt_one_minus_alpha_t) / sqrt_alpha_t + sqrt_one_minus_alpha_t_minus_delta * eps
 

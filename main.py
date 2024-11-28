@@ -27,7 +27,8 @@ model_kwargs["activation"] = parse_module_and_class(model_kwargs["activation"]["
 
 
 
-model = LDM(vae, **model_kwargs, text_model_kwargs=text_model_kwargs, token_limit=token_limit, **activation_kwargs)
+model = LDM(vae, **model_kwargs, text_model_kwargs=text_model_kwargs, token_limit=token_limit, **activation_kwargs,
+            scheduler="euler", n_backward_steps=50)
 
 summary(model)
 
@@ -42,7 +43,7 @@ print(c.shape)
 t = torch.randint(0, 1000, (1,)).cuda()
 out = model.forward(latent, t, c)
 print(out.shape)
-print(model.backward_diffusion_sampling(condition, 1000, 1).size)
+model.backward_diffusion_sampling(condition, 1000, 1)
 
 # from transformers import AutoTokenizer
 # from datasets.datasets import DBParquetDataset

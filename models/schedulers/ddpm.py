@@ -25,7 +25,7 @@ class DDPMScheduler(BaseScheduler):
             t - 1 (int): next time step
         """
 
-        x_t_minus_1 = self.one_by_sqrt_alpha[t] * (x - self.betas[t] * self.sqrt_one_minus_alpha_cumulative[t] * eps) \
-            + (z := torch.randn_like(x, dtype=x.dtype) if t > 1 else torch.zeros_like(x, dtype=x.dtype)) * self.sqrt_beta[t]
+        x_t_minus_1 = self.one_by_sqrt_alpha[t] * (x - self.betas[t].to(x.device) * self.sqrt_one_minus_alpha_cumulative[t].to(x.device) * eps) \
+            + (z := torch.randn_like(x, dtype=x.dtype) if t > 1 else torch.zeros_like(x, dtype=x.dtype)).to(x.device) * self.sqrt_beta[t].to(x.device)
         return x_t_minus_1, t - 1
     

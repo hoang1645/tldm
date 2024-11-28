@@ -1,7 +1,7 @@
 import torch
 from models.schedulers.base import BaseScheduler
 
-    
+
 class EulerDiscreteScheduler(BaseScheduler):
     def __init__(self, n_diffusion_steps, n_backward_steps,
                  beta_start = 0.00085, beta_end = 0.012):
@@ -22,7 +22,7 @@ class EulerDiscreteScheduler(BaseScheduler):
         s_noise: float = 1.0,
 ) -> torch.Tensor:
         assert torch.all(t >= self.step_size), "Time step must be no less than step size"
-        sigma = self.sigmas[t]
+        sigma = self.sigmas[t].to(x.device)
 
         gamma = 0
         if sigma > s_tmin and sigma < s_tmax:
@@ -38,7 +38,7 @@ class EulerDiscreteScheduler(BaseScheduler):
         pred_original_sample = x - sigma_hat * eps
         d = (x - pred_original_sample) / (sigma_hat + 1e-8)
         
-        dt = self.sigmas[(t - self.step_size).clamp(0, len(self.sigmas) - 1)] - sigma_hat
+        dt = self.sigmas[(t - self.step_size).clamp(0, len(self.sigmas) - 1)].to(x.device) - sigma_hat
 
         x_t_minus_delta = x + d * dt
 

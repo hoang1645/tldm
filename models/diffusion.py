@@ -103,9 +103,9 @@ class LDM(nn.Module):
         while time_step > 0:
             ts = torch.full((num_images,), time_step, device=self.device, dtype=dtype)
             predicted_noise = self(x, ts, c)
-            x, time_step = self.scheduler.backward(x, ts, predicted_noise)
+            x, _ = self.scheduler.backward(x, ts.long().cpu(), predicted_noise)
+            time_step -= self.scheduler.step_size
             pbar.update(task, advance=1)
-            
         x = self.autoencoder.decode(x).sample
         if self.inverse_scale_transform:
             x = self.inverse_transform(x).type(torch.uint8).to('cpu')
