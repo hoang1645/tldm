@@ -20,5 +20,5 @@ model:
     activation: 
       type: "torch.nn.SiLU"
       kwargs: null
-  
+  scheduler: euler
 

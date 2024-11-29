@@ -28,9 +28,9 @@ model_kwargs["activation"] = parse_module_and_class(model_kwargs["activation"]["
 
 
 model = LDM(vae, **model_kwargs, text_model_kwargs=text_model_kwargs, token_limit=token_limit, **activation_kwargs,
-            scheduler="euler", n_backward_steps=50)
+            scheduler=config["scheduler"], n_backward_steps=50)
 
-summary(model)
+summary(model, depth=4, verbose=1)
 
 condition = ["Hello, I am a condition"]
 x =  torch.randn(1, 3, 256, 256).cuda()
@@ -45,11 +45,3 @@ out = model.forward(latent, t, c)
 print(out.shape)
 model.backward_diffusion_sampling(condition, 1000, 1)
 
-# from transformers import AutoTokenizer
-# from datasets.datasets import DBParquetDataset
-# from tqdm import tqdm
-# tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-small")
-# dset = DBParquetDataset("/mnt/e/db")
-# for _, text in tqdm(dset):
-#     tokens = tokenizer(text, return_tensors="pt").input_ids
-#     assert tokens.numel() <= 256, (text, tokens.numel())

@@ -28,10 +28,11 @@ class LDM(nn.Module):
                  n_backward_steps:int = 1000,
                  **activation_kwargs):
         super().__init__()
-        print(activation_kwargs)
         self.autoencoder = vae
         self.diffusion = DiffusionTransformer(patch_size, channels, num_layers, model_dim, hidden_dim, n_heads, dropout, activation, **activation_kwargs)
         self.text_condition_embedding = TextConditionEmbedding(model_dim, text_model_kwargs, token_limit, freeze_text_encoders)
+
+        self.autoencoder.requires_grad_(False)
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.to(self.device)
@@ -94,7 +95,7 @@ class LDM(nn.Module):
         self.eval()
 
         pbar = Progress(TextColumn("Generating"), BarColumn(), MofNCompleteColumn(), TimeElapsedColumn(),
-                        TimeRemainingColumn())
+                        TimeRemainingColumn(), transient=True)
 
         task = pbar.add_task("", total=timesteps // self.scheduler.step_size - 1)
         pbar.start()
@@ -106,7 +107,9 @@ class LDM(nn.Module):
             x, _ = self.scheduler.backward(x, ts.long().cpu(), predicted_noise)
             time_step -= self.scheduler.step_size
             pbar.update(task, advance=1)
+        pbar.stop()
         x = self.autoencoder.decode(x).sample
+
         if self.inverse_scale_transform:
             x = self.inverse_transform(x).type(torch.uint8).to('cpu')
         else:
