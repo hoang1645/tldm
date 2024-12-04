@@ -89,7 +89,7 @@ class LDM(nn.Module):
         else:
             raise ValueError("Autoencoder must be an instance of AutoencoderKL or AutoencoderTiny")
         
-
+ 
         x = torch.randn((num_images, *shape[1:]), device=self.device, dtype=dtype)
 
         self.eval()

@@ -28,6 +28,7 @@ class BaseScheduler(ABC):
             n_diffusion_steps
         )
 
+    @abstractmethod
     def forward(self, x:torch.Tensor, timesteps:torch.Tensor):
         """
         Perform forward diffusion (based on DDPM):
